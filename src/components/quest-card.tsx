@@ -11,7 +11,7 @@ export interface QuestCardProps {
   quest: Quest;
   /** XP is locked by a penalty quest (daily reward will be forfeited). */
   xpLocked?: boolean;
-  /** Compact mode hides the description lines. */
+  /** Compact mode hides the description lines and objective notes. */
   compact?: boolean;
 }
 
@@ -19,6 +19,7 @@ const STATUS_TEXT: Record<Quest['status'], string> = {
   active: 'DEVAM EDİYOR',
   completed: 'TAMAMLANDI',
   failed: 'BAŞARISIZ',
+  excused: 'DİNLENME GÜNÜ',
 };
 
 export function QuestCard({ quest, xpLocked = false, compact = false }: QuestCardProps) {
@@ -61,6 +62,11 @@ export function QuestCard({ quest, xpLocked = false, compact = false }: QuestCar
                 </SystemText>
               </View>
               <ProgressBar progress={o.progress / o.target} color={done ? colors.success : barColor} height={4} />
+              {!compact && o.note ? (
+                <SystemText variant="caption" tone="muted" style={styles.note}>
+                  {`› ${o.note}`}
+                </SystemText>
+              ) : null}
             </View>
           );
         })}
@@ -93,6 +99,7 @@ const styles = StyleSheet.create({
   objective: { gap: spacing.xs },
   objectiveRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   flex: { flex: 1 },
+  note: { fontSize: 11, lineHeight: 15 },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -1,4 +1,4 @@
-import { DarkTheme, Stack, ThemeProvider, useRouter, type Theme } from 'expo-router';
+import { DarkTheme, Stack, ThemeProvider, usePathname, useRouter, type Theme } from 'expo-router';
 import { SQLiteProvider } from 'expo-sqlite';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -64,21 +64,37 @@ function RootNavigator() {
             contentStyle: { backgroundColor: 'transparent' },
           }}
         />
+        <Stack.Screen
+          name="boss"
+          options={{
+            presentation: 'transparentModal',
+            animation: 'fade',
+            gestureEnabled: false,
+            contentStyle: { backgroundColor: 'transparent' },
+          }}
+        />
         <Stack.Screen name="allocate" options={{ gestureEnabled: false, animation: 'slide_from_bottom' }} />
         <Stack.Screen name="rank-exam" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
       </Stack>
-      <LevelUpWatcher />
+      <SystemEventWatcher />
     </>
   );
 }
 
-/** Opens the LEVEL UP window whenever the game reports a level gain. */
-function LevelUpWatcher() {
-  const { pendingLevelUp, status } = useGame();
+/**
+ * Opens system popups in order: defeated bosses first (one per visit to /boss),
+ * then the LEVEL UP window. Each popup acknowledges its event and closes itself.
+ */
+function SystemEventWatcher() {
+  const { pendingLevelUp, pendingBoss, status } = useGame();
   const router = useRouter();
+  const pathname = usePathname();
   useEffect(() => {
-    if (status === 'ready' && pendingLevelUp) router.push('/level-up');
-  }, [pendingLevelUp, router, status]);
+    if (status !== 'ready') return;
+    if (pathname === '/boss' || pathname === '/level-up') return;
+    if (pendingBoss) router.push('/boss');
+    else if (pendingLevelUp) router.push('/level-up');
+  }, [pathname, pendingBoss, pendingLevelUp, router, status]);
   return null;
 }

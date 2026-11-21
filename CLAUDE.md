@@ -39,8 +39,9 @@ Expo Go uyumluluğu korunmalı: Expo Go'da olmayan native modül **eklenmez**.
     │   ├── _layout.tsx          #   Kök Stack + provider'lar
     │   ├── index.tsx            #   Yönlendirme (onboarding / sekmeler)
     │   ├── onboarding.tsx
-    │   ├── (tabs)/              #   Durum, Görevler, Antrenman, Rank
+    │   ├── (tabs)/              #   Durum, Görevler, Antrenman, Rank, İstatistik
     │   ├── level-up.tsx         #   Animasyonlu LEVEL UP modalı
+    │   ├── boss.tsx             #   "BOSS YENİLDİ" (kişisel rekor) modalı
     │   ├── allocate.tsx         #   Stat puanı dağıtma
     │   ├── rank-exam.tsx
     │   └── settings.tsx
@@ -69,6 +70,8 @@ Expo Go uyumluluğu korunmalı: Expo Go'da olmayan native modül **eklenmez**.
 7. Renk/boşluk/yazı tipi değerleri `src/theme.ts`'ten gelir; ekranlarda sabit hex kullanılmaz.
 8. Kullanıcı girdisi (tekrar, süre) oyun mantığına girmeden önce doğrulanır (`src/game` içindeki
    validator'larla); geçersiz değer state'e yazılmaz.
+9. Bu proje kendi implementasyonudur: başka projelerden (ör. AGPL lisanslı openGym) kod, metin veya
+   varlık kopyalanmaz.
 
 ## Komutlar
 

@@ -1,7 +1,17 @@
 import { getExercise, primaryStat } from './exercises';
 import { mulberry32, hashString, pickIndex } from './random';
+import { rpeFactor } from './rpe';
 import { weakestStat } from './stats';
-import type { DayKey, ExerciseId, ExerciseUnit, Player, Quest, QuestObjective, StatKey } from './types';
+import {
+  STAT_LABELS,
+  type DayKey,
+  type ExerciseId,
+  type ExerciseUnit,
+  type Player,
+  type Quest,
+  type QuestObjective,
+  type StatKey,
+} from './types';
 
 export const DAILY_QUEST_TITLE = 'Günlük Görev: Gelişim Protokolü';
 export const PENALTY_QUEST_TITLE = 'CEZA GÖREVİ: Hayatta Kalma';
@@ -64,12 +74,76 @@ export function roundTarget(raw: number, unit: ExerciseUnit, max: number): numbe
   return Math.min(max, Math.max(1, value));
 }
 
-export function dailyTarget(exerciseId: ExerciseId, player: Pick<Player, 'level' | 'stats'>): number {
+type TargetPlayer = Pick<Player, 'level' | 'stats'> & Partial<Pick<Player, 'rpe'>>;
+
+export interface TargetBreakdown {
+  exerciseId: ExerciseId;
+  base: number;
+  max: number;
+  level: number;
+  levelFactor: number;
+  stat: StatKey;
+  statValue: number;
+  statFactor: number;
+  /** RPE moving average, undefined when no RPE data. */
+  rpe: number | undefined;
+  rpeFactor: number;
+  raw: number;
+  target: number;
+  capped: boolean;
+}
+
+/** All inputs of a daily target (docs/GAME_DESIGN.md §5, §11). */
+export function dailyTargetBreakdown(exerciseId: ExerciseId, player: TargetPlayer): TargetBreakdown {
   const spec = DAILY_TARGETS[exerciseId];
   if (!spec) throw new Error(`No daily target for ${exerciseId}`);
-  const s = player.stats[primaryStat(exerciseId)];
-  const raw = spec.base * levelFactor(player.level) * statFactor(s);
-  return roundTarget(raw, getExercise(exerciseId).unit, spec.max);
+  const stat = primaryStat(exerciseId);
+  const statValue = player.stats[stat];
+  const rpe = player.rpe?.[exerciseId];
+  const lf = levelFactor(player.level);
+  const sf = statFactor(statValue);
+  const rf = rpeFactor(rpe);
+  const raw = spec.base * lf * sf * rf;
+  const target = roundTarget(raw, getExercise(exerciseId).unit, spec.max);
+  return {
+    exerciseId,
+    base: spec.base,
+    max: spec.max,
+    level: player.level,
+    levelFactor: lf,
+    stat,
+    statValue,
+    statFactor: sf,
+    rpe,
+    rpeFactor: rf,
+    raw,
+    target,
+    capped: target === spec.max && raw > spec.max,
+  };
+}
+
+export function dailyTarget(exerciseId: ExerciseId, player: TargetPlayer): number {
+  return dailyTargetBreakdown(exerciseId, player).target;
+}
+
+/** `1,16` — Turkish decimal comma with 2 decimals. */
+export function formatFactor(value: number): string {
+  return value.toFixed(2).replace('.', ',');
+}
+
+function formatRpe(value: number): string {
+  return (Math.round(value * 10) / 10).toFixed(1).replace('.', ',');
+}
+
+/** System note explaining a daily target (§12). */
+export function describeDailyTarget(b: TargetBreakdown): string {
+  const parts = [
+    `Taban ${b.base}`,
+    `Lv ${b.level} ×${formatFactor(b.levelFactor)}`,
+    `${STAT_LABELS[b.stat]} ${b.statValue} ×${formatFactor(b.statFactor)}`,
+  ];
+  if (b.rpe !== undefined) parts.push(`RPE ${formatRpe(b.rpe)} ×${formatFactor(b.rpeFactor)}`);
+  return `${parts.join(' · ')} → ${b.target}${b.capped ? ' (üst sınır)' : ''}`;
 }
 
 export function dailyRewardXp(level: number): number {
@@ -87,17 +161,26 @@ export function penaltyQuestId(dayKey: DayKey): string {
 /** Focus exercise for the day: drawn from the weakest stat's pool with a seeded RNG. */
 export function pickFocusExercise(player: Pick<Player, 'stats' | 'createdDay'>, dayKey: DayKey): ExerciseId {
   const pool = FOCUS_POOLS[weakestStat(player.stats)];
+  // NOTE: the seed format is part of the spec (§5) — changing it changes everyone's quests.
   const rng = mulberry32(hashString(`${player.createdDay}|${dayKey}|daily`));
   return pool[pickIndex(rng, pool.length)];
 }
 
 export function generateDailyQuest(player: Player, dayKey: DayKey): Quest {
-  const exerciseIds: ExerciseId[] = [...DAILY_CORE, pickFocusExercise(player, dayKey)];
-  const objectives: QuestObjective[] = exerciseIds.map((exerciseId) => ({
-    exerciseId,
-    target: dailyTarget(exerciseId, player),
-    progress: 0,
-  }));
+  const focus = pickFocusExercise(player, dayKey);
+  const weakest = weakestStat(player.stats);
+  const exerciseIds: ExerciseId[] = [...DAILY_CORE, focus];
+  const objectives: QuestObjective[] = exerciseIds.map((exerciseId, index) => {
+    const breakdown = dailyTargetBreakdown(exerciseId, player);
+    const isFocus = index === DAILY_CORE.length;
+    const prefix = isFocus ? `Odak: en zayıf statın ${STAT_LABELS[weakest]} (${player.stats[weakest]}). ` : '';
+    return {
+      exerciseId,
+      target: breakdown.target,
+      progress: 0,
+      note: prefix + describeDailyTarget(breakdown),
+    };
+  });
   return {
     id: dailyQuestId(dayKey),
     kind: 'daily',
@@ -118,11 +201,17 @@ export function generatePenaltyQuest(player: Pick<Player, 'level'>, dayKey: DayK
     kind: 'penalty',
     dayKey,
     title: PENALTY_QUEST_TITLE,
-    objectives: PENALTY_OBJECTIVES.map(({ exerciseId, base, max }) => ({
-      exerciseId,
-      target: roundTarget(base * lf, getExercise(exerciseId).unit, max),
-      progress: 0,
-    })),
+    objectives: PENALTY_OBJECTIVES.map(({ exerciseId, base, max }) => {
+      const raw = base * lf;
+      const target = roundTarget(raw, getExercise(exerciseId).unit, max);
+      const capped = target === max && raw > max;
+      return {
+        exerciseId,
+        target,
+        progress: 0,
+        note: `Ceza: taban ${base} · Lv ${player.level} ×${formatFactor(lf)} → ${target}${capped ? ' (üst sınır)' : ''}`,
+      };
+    }),
     rewardXp: 0,
     awardedXp: 0,
     status: 'active',

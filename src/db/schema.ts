@@ -76,6 +76,29 @@ export const MIGRATIONS: readonly string[] = [
     value TEXT NOT NULL
   );
   `,
+  // 2 — personal records, RPE, streak, rest days, stat snapshots (docs §10–§14)
+  `
+  ALTER TABLE player ADD COLUMN records TEXT NOT NULL DEFAULT '{}';
+  ALTER TABLE player ADD COLUMN rpe TEXT NOT NULL DEFAULT '{}';
+  ALTER TABLE player ADD COLUMN streak TEXT NOT NULL DEFAULT '{"current":0,"best":0,"lastCompletedDay":null}';
+
+  ALTER TABLE exercise_logs ADD COLUMN rpe INTEGER;
+  ALTER TABLE exercise_logs ADD COLUMN is_record INTEGER NOT NULL DEFAULT 0;
+  CREATE INDEX IF NOT EXISTS idx_exercise_logs_exercise ON exercise_logs (exercise_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS rest_days (
+    day_key TEXT PRIMARY KEY NOT NULL,
+    kind TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS stat_snapshots (
+    day_key TEXT PRIMARY KEY NOT NULL,
+    level INTEGER NOT NULL,
+    total_xp INTEGER NOT NULL,
+    stats TEXT NOT NULL
+  );
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

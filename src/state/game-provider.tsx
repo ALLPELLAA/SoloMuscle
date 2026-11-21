@@ -12,19 +12,27 @@ import {
   applyExerciseLogs,
   buildReminderPlan,
   createInitialState,
+  findRestDay,
+  getRestDayEligibility,
   isValidReminderTime,
   isXpLocked,
+  markRestDay as markRestDayRule,
   msUntilNextMidnight,
   rolloverDay,
   submitRankExam,
   toDayKey,
+  unmarkRestDay as unmarkRestDayRule,
   type BaselineTest,
   type DayKey,
   type ExerciseEntry,
   type GameState,
   type LogResult,
   type RankExamResult,
+  type RecordEvent,
   type ReminderSettings,
+  type RestDay,
+  type RestDayEligibility,
+  type RestDayKind,
   type RolloverEvent,
   type Stats,
 } from '@/game';
@@ -34,6 +42,7 @@ import {
   resetAllData,
   saveGameState,
   saveRankExam,
+  saveRestDay,
   saveWorkout,
   setSetting,
 } from '@/db/repository';
@@ -50,9 +59,13 @@ export interface LevelUpEvent {
 /** Noteworthy outcome of a day change, shown once as a system message. */
 export interface RolloverNotice {
   failedDaily: boolean;
+  /** Previous daily quest was not completed but the day was a rest/sick day. */
+  excusedDaily: boolean;
   daysSkipped: number;
   penaltyStarted: boolean;
   penaltyContinues: boolean;
+  /** Streak length that was lost (0 = not broken). */
+  streakLost: number;
 }
 
 export interface GameContextValue {
@@ -65,6 +78,12 @@ export interface GameContextValue {
   reminder: ReminderSettings;
   rolloverNotice: RolloverNotice | null;
   pendingLevelUp: LevelUpEvent | null;
+  /** First defeated boss waiting to be shown (personal record beaten). */
+  pendingBoss: RecordEvent | null;
+  /** Today's rest/sick mark, if any. */
+  restDayToday: RestDay | null;
+  /** Whether today can be marked as rest/sick day (null before onboarding). */
+  restDayEligibility: RestDayEligibility | null;
   /** Increments after every write; use as a dependency to refetch history. */
   dataVersion: number;
   /** Dev-only: days added to the real clock (always 0 in release builds). */
@@ -80,6 +99,10 @@ export interface GameContextValue {
   refresh(): Promise<void>;
   dismissRolloverNotice(): void;
   acknowledgeLevelUp(): void;
+  acknowledgeBoss(): void;
+  /** Marks today as rest/sick day: no penalty, streak kept (docs §13). */
+  markRestDay(kind: RestDayKind): Promise<void>;
+  unmarkRestDay(): Promise<void>;
   /** Dev-only: advance the simulated clock by `days` (to test rollover/penalty). */
   debugAdvanceDay(days?: number): Promise<void>;
 }
@@ -104,14 +127,29 @@ function parseReminder(text: string | null): ReminderSettings {
 }
 
 function noticeFromEvents(events: RolloverEvent[]): RolloverNotice | null {
-  const notice: RolloverNotice = { failedDaily: false, daysSkipped: 0, penaltyStarted: false, penaltyContinues: false };
+  const notice: RolloverNotice = {
+    failedDaily: false,
+    excusedDaily: false,
+    daysSkipped: 0,
+    penaltyStarted: false,
+    penaltyContinues: false,
+    streakLost: 0,
+  };
   for (const event of events) {
     if (event.type === 'daily_failed' && !event.forgiven) notice.failedDaily = true;
+    if (event.type === 'daily_excused') notice.excusedDaily = true;
     if (event.type === 'days_skipped') notice.daysSkipped = event.days;
     if (event.type === 'penalty_started') notice.penaltyStarted = true;
     if (event.type === 'penalty_continues') notice.penaltyContinues = true;
+    if (event.type === 'streak_broken') notice.streakLost = event.previous;
   }
-  const noteworthy = notice.failedDaily || notice.daysSkipped > 0 || notice.penaltyStarted || notice.penaltyContinues;
+  const noteworthy =
+    notice.failedDaily ||
+    notice.excusedDaily ||
+    notice.daysSkipped > 0 ||
+    notice.penaltyStarted ||
+    notice.penaltyContinues ||
+    notice.streakLost > 0;
   return noteworthy ? notice : null;
 }
 
@@ -137,6 +175,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [reminder, setReminder] = useState<ReminderSettings>(DEFAULT_REMINDER);
   const [rolloverNotice, setRolloverNotice] = useState<RolloverNotice | null>(null);
   const [pendingLevelUp, setPendingLevelUp] = useState<LevelUpEvent | null>(null);
+  const [bossQueue, setBossQueue] = useState<RecordEvent[]>([]);
   const [dataVersion, setDataVersion] = useState(0);
   const [debugDayOffset, setDebugDayOffset] = useState(0);
   const [today, setToday] = useState<DayKey>(() => toDayKey(Date.now()));
@@ -174,6 +213,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       settings: reminderRef.current,
       todayQuestDone: current.dailyQuest?.dayKey === todayKey && current.dailyQuest.status === 'completed',
       penaltyActive: isXpLocked(current),
+      todayRest: findRestDay(current.restDays, todayKey) !== undefined,
     });
     await syncReminders(plan);
   }, [now]);
@@ -279,9 +319,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
           endedAt,
           entries,
           entryXp: result.entryXp,
+          entryRecord: result.entryRecord,
           xpLocked: result.xpLocked,
         });
         commit(result.state);
+        const bosses = result.recordEvents.filter((e) => e.boss);
+        if (bosses.length > 0) setBossQueue((prev) => [...prev, ...bosses]);
         if (result.levelsGained > 0) {
           const event = { fromLevel: result.fromLevel, toLevel: result.toLevel, pointsGained: result.pointsGained };
           setPendingLevelUp((prev) => mergeLevelUp(prev, event));
@@ -354,6 +397,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         setDebugDayOffset(0);
         commit(null);
         setPendingLevelUp(null);
+        setBossQueue([]);
         setRolloverNotice(null);
         setStatus('onboarding');
         await syncReminders([]);
@@ -362,6 +406,37 @@ export function GameProvider({ children }: { children: ReactNode }) {
   );
 
   const refresh = useCallback(() => exclusive(runRollover), [exclusive, runRollover]);
+
+  const markRestDay = useCallback(
+    (kind: RestDayKind) =>
+      exclusive(async () => {
+        await runRollover();
+        const current = stateRef.current;
+        if (!current) throw new Error('Oyuncu bulunamadı.');
+        const todayKey = toDayKey(now());
+        const next = markRestDayRule(current, todayKey, kind);
+        await saveRestDay(db, next, { dayKey: todayKey, kind, now: now() });
+        commit(next);
+        await scheduleReminders();
+      }),
+    [commit, db, exclusive, now, runRollover, scheduleReminders],
+  );
+
+  const unmarkRestDay = useCallback(
+    () =>
+      exclusive(async () => {
+        await runRollover();
+        const current = stateRef.current;
+        if (!current) throw new Error('Oyuncu bulunamadı.');
+        const todayKey = toDayKey(now());
+        const next = unmarkRestDayRule(current, todayKey);
+        if (next === current) return;
+        await saveRestDay(db, next, { dayKey: todayKey, kind: null, now: now() });
+        commit(next);
+        await scheduleReminders();
+      }),
+    [commit, db, exclusive, now, runRollover, scheduleReminders],
+  );
 
   const debugAdvanceDay = useCallback(
     (days = 1) =>
@@ -386,15 +461,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
       log: (entries: ExerciseEntry[]) => logWorkout(entries),
       advanceDay: (days = 1) => debugAdvanceDay(days),
       allocate: (allocation: Partial<Stats>) => allocatePoints(allocation),
+      rest: (kind: RestDayKind = 'rest') => markRestDay(kind),
       getState: () => stateRef.current,
     };
     return () => {
       delete target.__solomuscleDev;
     };
-  }, [allocatePoints, completeOnboarding, debugAdvanceDay, logWorkout]);
+  }, [allocatePoints, completeOnboarding, debugAdvanceDay, logWorkout, markRestDay]);
 
   const dismissRolloverNotice = useCallback(() => setRolloverNotice(null), []);
   const acknowledgeLevelUp = useCallback(() => setPendingLevelUp(null), []);
+  const acknowledgeBoss = useCallback(() => setBossQueue((prev) => prev.slice(1)), []);
+
+  const restDayToday = state ? (findRestDay(state.restDays, today) ?? null) : null;
+  const restDayEligibility = state ? getRestDayEligibility(state, today) : null;
+  const pendingBoss = bossQueue[0] ?? null;
 
   const value = useMemo<GameContextValue>(
     () => ({
@@ -406,6 +487,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
       reminder,
       rolloverNotice,
       pendingLevelUp,
+      pendingBoss,
+      restDayToday,
+      restDayEligibility,
       dataVersion,
       debugDayOffset,
       completeOnboarding,
@@ -417,6 +501,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
       refresh,
       dismissRolloverNotice,
       acknowledgeLevelUp,
+      acknowledgeBoss,
+      markRestDay,
+      unmarkRestDay,
       debugAdvanceDay,
     }),
     [
@@ -427,6 +514,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
       reminder,
       rolloverNotice,
       pendingLevelUp,
+      pendingBoss,
+      restDayToday,
+      restDayEligibility,
       dataVersion,
       debugDayOffset,
       completeOnboarding,
@@ -438,6 +528,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
       refresh,
       dismissRolloverNotice,
       acknowledgeLevelUp,
+      acknowledgeBoss,
+      markRestDay,
+      unmarkRestDay,
       debugAdvanceDay,
     ],
   );

@@ -32,6 +32,8 @@ export interface ReminderPlanInput {
   settings: ReminderSettings;
   todayQuestDone: boolean;
   penaltyActive: boolean;
+  /** Today is marked as a rest/sick day: no reminder today (§8, §13). */
+  todayRest?: boolean;
   days?: number;
 }
 
@@ -40,7 +42,7 @@ export function isValidReminderTime(hour: number, minute: number): boolean {
 }
 
 export function buildReminderPlan(input: ReminderPlanInput): PlannedReminder[] {
-  const { now, settings, todayQuestDone, penaltyActive } = input;
+  const { now, settings, todayQuestDone, penaltyActive, todayRest = false } = input;
   const days = input.days ?? REMINDER_DAYS_AHEAD;
   if (!settings.enabled || !isValidReminderTime(settings.hour, settings.minute)) return [];
 
@@ -50,6 +52,7 @@ export function buildReminderPlan(input: ReminderPlanInput): PlannedReminder[] {
     const at = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i, settings.hour, settings.minute).getTime();
     if (at <= now) continue;
     if (i === 0) {
+      if (todayRest) continue;
       if (penaltyActive) {
         plan.push({ at, ...REMINDER_TEXT.penalty });
         continue;

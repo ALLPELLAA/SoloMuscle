@@ -66,6 +66,33 @@ export interface BaselineTest {
   plankSeconds: number;
 }
 
+export type RecordSource = 'baseline' | 'set' | 'exam';
+
+/** Best single-set amount of an exercise (docs/GAME_DESIGN.md §10). */
+export interface PersonalRecord {
+  amount: number;
+  dayKey: DayKey;
+  source: RecordSource;
+  /** Last day a boss bonus was granted for this exercise (max one per day). */
+  bonusDay: DayKey | null;
+}
+
+export type PersonalRecords = Partial<Record<ExerciseId, PersonalRecord>>;
+
+/** Consecutive completed daily quests; rest days neither break nor extend it (§13). */
+export interface Streak {
+  current: number;
+  best: number;
+  lastCompletedDay: DayKey | null;
+}
+
+export type RestDayKind = 'rest' | 'sick';
+
+export interface RestDay {
+  dayKey: DayKey;
+  kind: RestDayKind;
+}
+
 export interface Player {
   name: string;
   level: number;
@@ -80,15 +107,22 @@ export interface Player {
   baseline: BaselineTest;
   createdDay: DayKey;
   rankExamCooldownUntil: DayKey | null;
+  records: PersonalRecords;
+  /** Per-exercise RPE moving average (§11). */
+  rpe: Partial<Record<ExerciseId, number>>;
+  streak: Streak;
 }
 
 export type QuestKind = 'daily' | 'penalty';
-export type QuestStatus = 'active' | 'completed' | 'failed';
+/** `excused`: not completed on a rest/sick day — no penalty (§13). */
+export type QuestStatus = 'active' | 'completed' | 'failed' | 'excused';
 
 export interface QuestObjective {
   exerciseId: ExerciseId;
   target: number;
   progress: number;
+  /** Short system explanation of the target (§12). */
+  note: string;
 }
 
 export interface Quest {
@@ -111,12 +145,16 @@ export interface GameState {
   /** Current penalty quest (active, or completed but not yet archived). */
   penaltyQuest: Quest | null;
   lastRolloverDay: DayKey;
+  /** Days marked as rest/sick (§13). */
+  restDays: RestDay[];
 }
 
 /** One logged set. `amount` is in the exercise's unit. */
 export interface ExerciseEntry {
   exerciseId: ExerciseId;
   amount: number;
+  /** Optional perceived exertion 1–10 (§11). */
+  rpe?: number;
 }
 
 export type GameErrorCode =
@@ -125,7 +163,9 @@ export type GameErrorCode =
   | 'invalid_allocation'
   | 'invalid_xp'
   | 'exam_not_allowed'
-  | 'unknown_exercise';
+  | 'unknown_exercise'
+  | 'invalid_rpe'
+  | 'rest_day_not_allowed';
 
 export class GameRuleError extends Error {
   readonly code: GameErrorCode;

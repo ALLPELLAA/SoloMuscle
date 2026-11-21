@@ -3,7 +3,7 @@
  */
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import type { BaselineTest, DayKey, ExerciseEntry, GameState, Quest, Rank } from '@/game';
+import type { BaselineTest, DailyVolumeRow, DayKey, ExerciseEntry, ExerciseId, GameState, Quest, Rank, RestDayKind } from '@/game';
 
 import {
   playerToParams,
@@ -12,13 +12,21 @@ import {
   rowToPlayer,
   rowToQuest,
   rowToRankExam,
+  rowToRestDay,
   rowToSession,
+  rowToSnapshot,
+  rowsToLastSets,
   type ExerciseLog,
   type ExerciseLogRow,
+  type LastSet,
+  type LastSetRow,
   type PlayerRow,
   type QuestRow,
   type RankExamRecord,
   type RankExamRow,
+  type RestDayRow,
+  type StatSnapshot,
+  type StatSnapshotRow,
   type WorkoutSessionRow,
   type WorkoutSessionSummary,
 } from './mappers';
@@ -26,8 +34,9 @@ import {
 const UPSERT_PLAYER = `
   INSERT INTO player (
     id, name, level, xp, total_xp, rank, stats, stat_xp, unspent_points, baseline,
-    created_day, rank_exam_cooldown_until, last_rollover_day, daily_quest_id, penalty_quest_id, updated_at
-  ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    created_day, rank_exam_cooldown_until, last_rollover_day, daily_quest_id, penalty_quest_id, updated_at,
+    records, rpe, streak
+  ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT (id) DO UPDATE SET
     name = excluded.name,
     level = excluded.level,
@@ -43,7 +52,18 @@ const UPSERT_PLAYER = `
     last_rollover_day = excluded.last_rollover_day,
     daily_quest_id = excluded.daily_quest_id,
     penalty_quest_id = excluded.penalty_quest_id,
-    updated_at = excluded.updated_at
+    updated_at = excluded.updated_at,
+    records = excluded.records,
+    rpe = excluded.rpe,
+    streak = excluded.streak
+`;
+
+const UPSERT_SNAPSHOT = `
+  INSERT INTO stat_snapshots (day_key, level, total_xp, stats) VALUES (?, ?, ?, ?)
+  ON CONFLICT (day_key) DO UPDATE SET
+    level = excluded.level,
+    total_xp = excluded.total_xp,
+    stats = excluded.stats
 `;
 
 const UPSERT_QUEST = `
@@ -69,15 +89,17 @@ async function getQuest(db: SQLiteDatabase, id: string | null): Promise<Quest | 
 export async function loadGameState(db: SQLiteDatabase): Promise<GameState | null> {
   const row = await db.getFirstAsync<PlayerRow>('SELECT * FROM player WHERE id = 1');
   if (!row) return null;
-  const [dailyQuest, penaltyQuest] = await Promise.all([
+  const [dailyQuest, penaltyQuest, restRows] = await Promise.all([
     getQuest(db, row.daily_quest_id),
     getQuest(db, row.penalty_quest_id),
+    db.getAllAsync<RestDayRow>('SELECT * FROM rest_days ORDER BY day_key ASC'),
   ]);
   return {
     player: rowToPlayer(row),
     dailyQuest,
     penaltyQuest,
     lastRolloverDay: row.last_rollover_day,
+    restDays: restRows.map(rowToRestDay),
   };
 }
 
@@ -94,6 +116,14 @@ async function writeState(db: SQLiteDatabase, state: GameState, archived: Quest[
       penaltyQuestId: state.penaltyQuest?.id ?? null,
       updatedAt: now,
     }),
+  );
+  // One snapshot per day: the last save of the day wins (stat charts, docs §14).
+  await db.runAsync(
+    UPSERT_SNAPSHOT,
+    state.lastRolloverDay,
+    state.player.level,
+    state.player.totalXp,
+    JSON.stringify(state.player.stats),
   );
 }
 
@@ -113,6 +143,8 @@ export interface WorkoutRecord {
   endedAt: number;
   entries: ExerciseEntry[];
   entryXp: number[];
+  /** Per entry: did it set a personal record? */
+  entryRecord: boolean[];
   xpLocked: boolean;
 }
 
@@ -137,8 +169,8 @@ export async function saveWorkout(
     for (let i = 0; i < workout.entries.length; i++) {
       const entry = workout.entries[i];
       await db.runAsync(
-        `INSERT INTO exercise_logs (session_id, exercise_id, amount, set_index, day_key, created_at, xp_awarded)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO exercise_logs (session_id, exercise_id, amount, set_index, day_key, created_at, xp_awarded, rpe, is_record)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         sessionId,
         entry.exerciseId,
         entry.amount,
@@ -146,6 +178,8 @@ export async function saveWorkout(
         workout.dayKey,
         workout.endedAt,
         workout.entryXp[i] ?? 0,
+        entry.rpe ?? null,
+        workout.entryRecord[i] ? 1 : 0,
       );
     }
     await writeState(db, state, [], workout.endedAt);
@@ -222,7 +256,78 @@ export async function setSetting(db: SQLiteDatabase, key: string, value: string)
   );
 }
 
-/** Deletes all progress (keeps the schema). */
+/** Stores today's rest-day mark (kind) or removes it (null) together with the new state. */
+export async function saveRestDay(
+  db: SQLiteDatabase,
+  state: GameState,
+  change: { dayKey: DayKey; kind: RestDayKind | null; now: number },
+): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    if (change.kind) {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO rest_days (day_key, kind, created_at) VALUES (?, ?, ?)',
+        change.dayKey,
+        change.kind,
+        change.now,
+      );
+    } else {
+      await db.runAsync('DELETE FROM rest_days WHERE day_key = ?', change.dayKey);
+    }
+    await writeState(db, state, [], change.now);
+  });
+}
+
+/** Most recent set (amount + RPE) of every exercise, for auto-fill (docs §9). */
+export async function getLastSets(db: SQLiteDatabase): Promise<Partial<Record<ExerciseId, LastSet>>> {
+  const rows = await db.getAllAsync<LastSetRow>(
+    `SELECT l.exercise_id AS exercise_id, l.amount AS amount, l.rpe AS rpe
+     FROM (SELECT DISTINCT exercise_id FROM exercise_logs) e
+     JOIN exercise_logs l ON l.id = (
+       SELECT l2.id FROM exercise_logs l2
+       WHERE l2.exercise_id = e.exercise_id
+       ORDER BY l2.created_at DESC, l2.set_index DESC
+       LIMIT 1
+     )`,
+  );
+  return rowsToLastSets(rows);
+}
+
+/** Per-day, per-exercise volume since `fromDay` (inclusive) for the heatmap. */
+export async function getDailyVolume(db: SQLiteDatabase, fromDay: DayKey): Promise<DailyVolumeRow[]> {
+  return db.getAllAsync<DailyVolumeRow>(
+    `SELECT day_key AS dayKey, exercise_id AS exerciseId, SUM(amount) AS amount
+     FROM exercise_logs WHERE day_key >= ? GROUP BY day_key, exercise_id`,
+    fromDay,
+  );
+}
+
+export async function listCompletedQuestDays(db: SQLiteDatabase, fromDay: DayKey): Promise<DayKey[]> {
+  const rows = await db.getAllAsync<{ day_key: string }>(
+    "SELECT day_key FROM quests WHERE kind = 'daily' AND status = 'completed' AND day_key >= ?",
+    fromDay,
+  );
+  return rows.map((r) => r.day_key);
+}
+
+/** Last `limit` daily stat snapshots, oldest first. */
+export async function listStatSnapshots(db: SQLiteDatabase, limit = 60): Promise<StatSnapshot[]> {
+  const rows = await db.getAllAsync<StatSnapshotRow>(
+    'SELECT * FROM stat_snapshots ORDER BY day_key DESC LIMIT ?',
+    limit,
+  );
+  return rows.map(rowToSnapshot).reverse();
+}
+
+/** Sets that created or beat a personal record, newest first. */
+export async function listRecordLogs(db: SQLiteDatabase, limit = 30): Promise<ExerciseLog[]> {
+  const rows = await db.getAllAsync<ExerciseLogRow>(
+    'SELECT * FROM exercise_logs WHERE is_record = 1 ORDER BY created_at DESC, set_index DESC LIMIT ?',
+    limit,
+  );
+  return rows.map(rowToExerciseLog).filter((log): log is ExerciseLog => log !== null);
+}
+
+/** Deletes all progress (keeps the schema and settings). */
 export async function resetAllData(db: SQLiteDatabase): Promise<void> {
   await db.withTransactionAsync(async () => {
     await db.execAsync(`
@@ -230,6 +335,8 @@ export async function resetAllData(db: SQLiteDatabase): Promise<void> {
       DELETE FROM workout_sessions;
       DELETE FROM rank_exams;
       DELETE FROM quests;
+      DELETE FROM rest_days;
+      DELETE FROM stat_snapshots;
       DELETE FROM player;
     `);
   });

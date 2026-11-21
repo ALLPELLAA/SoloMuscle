@@ -5,16 +5,22 @@ import {
   RANKS,
   STAT_KEYS,
   isExerciseId,
+  isValidRpe,
   type BaselineTest,
   type DayKey,
   type ExerciseId,
+  type PersonalRecords,
   type Player,
   type Quest,
   type QuestKind,
   type QuestObjective,
   type QuestStatus,
   type Rank,
+  type RecordSource,
+  type RestDay,
+  type RestDayKind,
   type Stats,
+  type Streak,
 } from '@/game';
 
 export interface PlayerRow {
@@ -34,6 +40,9 @@ export interface PlayerRow {
   daily_quest_id: string | null;
   penalty_quest_id: string | null;
   updated_at: number;
+  records: string;
+  rpe: string;
+  streak: string;
 }
 
 export interface QuestRow {
@@ -57,6 +66,8 @@ export interface ExerciseLogRow {
   day_key: string;
   created_at: number;
   xp_awarded: number;
+  rpe: number | null;
+  is_record: number;
 }
 
 export interface ExerciseLog {
@@ -68,6 +79,8 @@ export interface ExerciseLog {
   dayKey: DayKey;
   createdAt: number;
   xpAwarded: number;
+  rpe: number | null;
+  isRecord: boolean;
 }
 
 export interface WorkoutSessionRow {
@@ -142,6 +155,44 @@ export function parseRank(value: string): Rank {
   return (RANKS as readonly string[]).includes(value) ? (value as Rank) : 'E';
 }
 
+const RECORD_SOURCES: readonly RecordSource[] = ['baseline', 'set', 'exam'];
+
+export function parseRecords(text: string): PersonalRecords {
+  const raw = parseJson<Record<string, unknown>>(text, {});
+  const records: PersonalRecords = {};
+  if (!raw || typeof raw !== 'object') return records;
+  for (const [key, value] of Object.entries(raw)) {
+    if (!isExerciseId(key) || !value || typeof value !== 'object') continue;
+    const r = value as Record<string, unknown>;
+    const amount = toNumber(r.amount, -1);
+    if (amount <= 0 || typeof r.dayKey !== 'string') continue;
+    records[key] = {
+      amount,
+      dayKey: r.dayKey,
+      source: RECORD_SOURCES.includes(r.source as RecordSource) ? (r.source as RecordSource) : 'set',
+      bonusDay: typeof r.bonusDay === 'string' ? r.bonusDay : null,
+    };
+  }
+  return records;
+}
+
+export function parseRpeMap(text: string): Partial<Record<ExerciseId, number>> {
+  const raw = parseJson<Record<string, unknown>>(text, {});
+  const map: Partial<Record<ExerciseId, number>> = {};
+  if (!raw || typeof raw !== 'object') return map;
+  for (const [key, value] of Object.entries(raw)) {
+    if (isExerciseId(key) && typeof value === 'number' && value >= 1 && value <= 10) map[key] = value;
+  }
+  return map;
+}
+
+export function parseStreak(text: string): Streak {
+  const raw = parseJson<Record<string, unknown>>(text, {});
+  const current = Math.max(0, Math.floor(toNumber(raw?.current)));
+  const best = Math.max(current, Math.floor(toNumber(raw?.best)));
+  return { current, best, lastCompletedDay: typeof raw?.lastCompletedDay === 'string' ? raw.lastCompletedDay : null };
+}
+
 export function rowToPlayer(row: PlayerRow): Player {
   return {
     name: row.name,
@@ -155,6 +206,9 @@ export function rowToPlayer(row: PlayerRow): Player {
     baseline: parseBaseline(row.baseline),
     createdDay: row.created_day,
     rankExamCooldownUntil: row.rank_exam_cooldown_until,
+    records: parseRecords(row.records ?? '{}'),
+    rpe: parseRpeMap(row.rpe ?? '{}'),
+    streak: parseStreak(row.streak ?? '{}'),
   };
 }
 
@@ -179,6 +233,9 @@ export function playerToParams(
     extra.dailyQuestId,
     extra.penaltyQuestId,
     extra.updatedAt,
+    JSON.stringify(player.records),
+    JSON.stringify(player.rpe),
+    JSON.stringify(player.streak),
   ];
 }
 
@@ -190,13 +247,18 @@ function parseObjectives(text: string): QuestObjective[] {
     if (!item || typeof item !== 'object') continue;
     const o = item as Record<string, unknown>;
     if (typeof o.exerciseId !== 'string' || !isExerciseId(o.exerciseId)) continue;
-    objectives.push({ exerciseId: o.exerciseId, target: toNumber(o.target, 1), progress: toNumber(o.progress) });
+    objectives.push({
+      exerciseId: o.exerciseId,
+      target: toNumber(o.target, 1),
+      progress: toNumber(o.progress),
+      note: typeof o.note === 'string' ? o.note : '',
+    });
   }
   return objectives;
 }
 
 const QUEST_KINDS: readonly QuestKind[] = ['daily', 'penalty'];
-const QUEST_STATUSES: readonly QuestStatus[] = ['active', 'completed', 'failed'];
+const QUEST_STATUSES: readonly QuestStatus[] = ['active', 'completed', 'failed', 'excused'];
 
 export function rowToQuest(row: QuestRow): Quest {
   return {
@@ -238,6 +300,8 @@ export function rowToExerciseLog(row: ExerciseLogRow): ExerciseLog | null {
     dayKey: row.day_key,
     createdAt: row.created_at,
     xpAwarded: row.xp_awarded,
+    rpe: isValidRpe(row.rpe) ? row.rpe : null,
+    isRecord: row.is_record === 1,
   };
 }
 
@@ -262,4 +326,53 @@ export function rowToRankExam(row: RankExamRow): RankExamRecord {
     dayKey: row.day_key,
     takenAt: row.taken_at,
   };
+}
+
+export interface RestDayRow {
+  day_key: string;
+  kind: string;
+  created_at: number;
+}
+
+export function rowToRestDay(row: RestDayRow): RestDay {
+  const kind: RestDayKind = row.kind === 'sick' ? 'sick' : 'rest';
+  return { dayKey: row.day_key, kind };
+}
+
+export interface StatSnapshotRow {
+  day_key: string;
+  level: number;
+  total_xp: number;
+  stats: string;
+}
+
+export interface StatSnapshot {
+  dayKey: DayKey;
+  level: number;
+  totalXp: number;
+  stats: Stats;
+}
+
+export function rowToSnapshot(row: StatSnapshotRow): StatSnapshot {
+  return { dayKey: row.day_key, level: row.level, totalXp: row.total_xp, stats: parseStats(row.stats) };
+}
+
+export interface LastSetRow {
+  exercise_id: string;
+  amount: number;
+  rpe: number | null;
+}
+
+export interface LastSet {
+  amount: number;
+  rpe: number | null;
+}
+
+export function rowsToLastSets(rows: readonly LastSetRow[]): Partial<Record<ExerciseId, LastSet>> {
+  const map: Partial<Record<ExerciseId, LastSet>> = {};
+  for (const row of rows) {
+    if (!isExerciseId(row.exercise_id) || map[row.exercise_id]) continue;
+    map[row.exercise_id] = { amount: row.amount, rpe: isValidRpe(row.rpe) ? row.rpe : null };
+  }
+  return map;
 }

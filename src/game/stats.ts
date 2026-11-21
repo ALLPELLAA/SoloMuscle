@@ -1,3 +1,5 @@
+import { initialRecordsFromBaseline } from './records';
+import { emptyStreak } from './rest-days';
 import {
   GameRuleError,
   STAT_KEYS,
@@ -88,6 +90,9 @@ export function createPlayer(name: string, baseline: BaselineTest, today: DayKey
     baseline: { ...baseline },
     createdDay: today,
     rankExamCooldownUntil: null,
+    records: initialRecordsFromBaseline(baseline, today),
+    rpe: {},
+    streak: emptyStreak(),
   };
 }
 

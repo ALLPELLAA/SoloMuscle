@@ -141,12 +141,13 @@ rng  = mulberry32(seed)
 | Vitalite | `walk`, `run` |
 | Esneklik | `stretch`, `yoga` |
 
-**Hedef miktarı (seviye ve stata göre ölçeklenir):**
+**Hedef miktarı (seviye, stat ve RPE'ye göre ölçeklenir):**
 
 ```
 levelFactor = 1 + 0.08·(level − 1)
-statFactor  = clamp(0.6 + S/25, 0.8, 3.0)      S = egzersizin birincil statının değeri
-raw         = base · levelFactor · statFactor
+statFactor  = clamp(0.6 + S/25, 0.8, 3.0)        S = egzersizin birincil statının değeri
+rpeFactor   = clamp(1 + (7 − R)·0.05, 0.8, 1.2)    R = egzersizin RPE ortalaması (§11); yoksa 1
+raw         = base · levelFactor · statFactor · rpeFactor
 ```
 
 Yuvarlama: tekrar → `raw ≥ 20` ise en yakın 5'in katı, değilse `Math.round`; saniye → en yakın 5'in
@@ -175,6 +176,9 @@ Tüm hedefler `progress ≥ target` olunca görev `completed` olur.
 
 Kimlik: `daily-<dayKey>`.
 
+Her hedefin bir **sistem açıklaması** (`note`) vardır; hedef üretilirken yazılır ve sayının nereden
+geldiğini gösterir (bkz. §12).
+
 ## 6. Gün dönümü ve Ceza Görevi
 
 `rolloverDay(state, today)` uygulama açılışında, ön plana gelişte ve 00:00'da çağrılır.
@@ -182,14 +186,18 @@ Kimlik: `daily-<dayKey>`.
 - `today == lastRolloverDay`: günlük görev yoksa üretilir; başka değişiklik yok.
 - `today < lastRolloverDay` (saat geri alınmış): **hiçbir şey değişmez** (istismar koruması).
 - `today > lastRolloverDay`:
-  1. Önceki günlük görev hâlâ `active` ise `failed` yapılır. Bu görevin günü `createdDay` değilse
-     (onboarding günü **tolerans günüdür**) → **kaçırıldı**.
+  1. Önceki günlük görev hâlâ `active` ise:
+     - görevin günü **dinlenme/hasta günü** olarak işaretliyse (§13) → `excused` yapılır, kaçırılmış
+       sayılmaz;
+     - değilse `failed` yapılır. Bu görevin günü `createdDay` değilse (onboarding günü **tolerans
+       günüdür**) → **kaçırıldı**.
   2. `diffDays(lastRolloverDay, today) ≥ 2` ise (arada uygulamanın hiç açılmadığı tam gün var)
      → **kaçırıldı**.
   3. Tamamlanmış/başarısız eski ceza görevi state'ten çıkarılır (arşivlenir).
   4. Kaçırıldıysa ve aktif ceza görevi yoksa → bugün için **Ceza Görevi** açılır. Zaten aktif ceza
      varsa yenisi eklenmez (birikmez), mevcut ceza devam eder.
-  5. Bugünün günlük görevi üretilir; `lastRolloverDay = today`.
+  5. Önceki görev `failed` olduysa veya 2. madde gerçekleştiyse **seri sıfırlanır** (§13).
+  6. Bugünün günlük görevi üretilir; `lastRolloverDay = today`.
 
 **Ceza Görevi** (`penalty-<dayKey>`, başlık "CEZA GÖREVİ: Hayatta Kalma"):
 
@@ -237,6 +245,7 @@ Yerel, günlük hatırlatma (varsayılan **açık, 19:00**). Plan önümüzdeki 
 tarih tetikleyicileriyle kurulur ve her açılışta / görev tamamlanınca yeniden hesaplanır:
 
 - Saati geçmiş hatırlatma kurulmaz.
+- Bugün dinlenme/hasta günü olarak işaretliyse bugünkü hatırlatma **hiç** kurulmaz.
 - Bugünün günlük görevi tamamlandıysa ve ceza yoksa bugünkü hatırlatma atlanır.
 - Bugün ceza aktifse bugünkü metin ceza uyarısıdır.
 
@@ -247,7 +256,74 @@ tarih tetikleyicileriyle kurulur ve her açılışta / görev tamamlanınca yeni
 
 ## 9. Antrenman kaydı
 
-- Antrenman = set listesi; her set `{ exerciseId, amount }` (tekrar/saniye/dakika).
+- Antrenman = set listesi; her set `{ exerciseId, amount, rpe? }` (tekrar/saniye/dakika; RPE §11).
+- Yeni set girilirken miktar ve RPE, o egzersizin **bir önceki setinden** otomatik doldurulur
+  (önce bu antrenmandaki son set, yoksa veritabanındaki son kayıt).
 - Dinlenme zamanlayıcısı: hazır süreler 30 / 60 / 90 / 120 / 180 sn; kalan süre zaman damgasından
   hesaplanır (`max(0, startedAt + duration − now)`), böylece uygulama arka plana gitse de doğru kalır.
 - Antrenman bitirilince setler sırayla §4 kurallarıyla işlenir; her set için verilen XP kaydedilir.
+
+## 10. Kişisel rekor ve Boss
+
+Her egzersiz için **kişisel rekor** = tek bir sette ulaşılan en yüksek miktar
+(`records[exerciseId] = { amount, dayKey, source, bonusDay }`).
+
+- Onboarding testi şınav/mekik/squat/plank için başlangıç rekorlarını oluşturur (`source: 'baseline'`,
+  değer > 0 ise).
+- Bir set işlenirken (§4 sırasında, setin XP'sinden sonra):
+  - Egzersizin rekoru yoksa: set ilk rekor olur (`source: 'set'`). **Boss sayılmaz**, bonus yok.
+  - `amount > rekor` ise: rekor güncellenir ve **BOSS YENİLDİ**. Bonus XP:
+    ```
+    recordBonusXp(level) = 30 + 10·level        (level = o anki level)
+    ```
+    Bonus yalnızca level XP'sine eklenir. Aynı egzersiz için **günde en fazla bir** bonus verilir
+    (`bonusDay`); aynı gün yeni rekorlar yine kaydedilir ve boss penceresi gösterilir, bonus 0'dır.
+  - XP kilidi aktifse (ceza) rekor yine güncellenir ama bonus 0'dır ve `bonusDay` değişmez. Kilit,
+    §4'teki gibi setin işlenmeye başladığı andaki duruma göre belirlenir.
+- Rank sınavı sonuçları da dört hareketin rekorlarını günceller (`source: 'exam'`), boss/bonus yok.
+- Her egzersizin boss adı sabittir (ör. Şınav → "Demir Golem").
+
+## 11. RPE (zorluk) ve uyarlanabilir hedefler
+
+- Her sete isteğe bağlı **RPE 1–10** (tamsayı) girilir: 1 = çok kolay, 10 = maksimum efor.
+- Egzersiz başına RPE ortalaması üstel hareketli ortalama ile tutulur (2 ondalığa yuvarlanır):
+  ```
+  R_yeni = R yoksa rpe, varsa round2(0.7·R + 0.3·rpe)
+  ```
+  RPE güncellemesi XP kilidinden etkilenmez.
+- Günlük görev üretilirken `rpeFactor` (§5) kullanılır: hedef bölge RPE 7. Kolay geliyorsa (R < 7)
+  hedef artar, zor geliyorsa (R > 7) azalır; en fazla ±%20. Bugünün görevi değişmez; etki bir
+  sonraki üretilen görevde görülür. Ceza görevine RPE uygulanmaz.
+
+## 12. Hedef açıklamaları
+
+Her görev hedefi üretilirken kısa bir açıklama (`note`) yazılır. Ondalık ayırıcı virgüldür.
+
+- Günlük hedef: `Taban 10 · Lv 3 ×1,16 · Güç 14 ×1,16 · RPE 8,4 ×0,93 → 13`
+  (RPE verisi yoksa RPE kısmı yazılmaz; üst sınıra takıldıysa sonuna ` (üst sınır)` eklenir).
+- Odak hedefinde başa `Odak: en zayıf statın <Stat> (<değer>). ` eklenir.
+- Ceza hedefi: `Ceza: taban 20 · Lv 3 ×1,16 → 25` (stat/RPE çarpanı yok).
+
+## 13. Dinlenme / hasta günü ve seri
+
+- Oyuncu **bugünü** dinlenme (`rest`) veya hasta (`sick`) günü olarak işaretleyebilir.
+  Koşullar (sırayla): bugün zaten işaretli değil (`already_marked`), bugünün günlük görevi tamamlanmamış
+  (`quest_completed`), son 7 günde (bugün dahil) en fazla **3** işaretli gün (`limit`).
+- İşaret aynı gün içinde kaldırılabilir; geçmiş günler işaretlenemez/değiştirilemez.
+- Etkisi: o günün görevi tamamlanmazsa gün dönümünde `excused` olur → **ceza görevi açılmaz** ve
+  **seri bozulmaz**. Aktif bir ceza görevi varsa kaldırılmaz. O gün egzersiz yapılabilir, XP kurallar
+  aynıdır. O günün hatırlatması kurulmaz.
+- **Seri** (`streak = { current, best, lastCompletedDay }`): günlük görev tamamlandığında
+  `current += 1`, `best = max(best, current)`. Dinlenme günleri seriyi ne artırır ne bozar.
+  Gün dönümünde önceki görev `failed` ise veya uygulama tam bir gün hiç açılmadıysa `current = 0`.
+
+## 14. İstatistikler
+
+- **Aktivite ısı haritası:** son 20 hafta, haftalar Pazartesi başlar, sütun = hafta. Günün değeri =
+  o günkü tüm setlerin ham XP'si (`Σ round(amount·xpPerUnit)`, XP kilidinden bağımsız). Seviye 0–4:
+  değer 0 ise 0; aksi halde aralıktaki sıfırdan büyük değerlerin çeyrekliklerine göre
+  (`≤ Q1` → 1, `≤ Q2` → 2, `≤ Q3` → 3, üstü → 4). Çeyreklik: sıralı dizide
+  `q(p) = v[floor(p·(n−1))]`. Dinlenme günleri ve günlük görevin tamamlandığı günler ayrıca işaretlenir.
+- **Stat grafikleri:** her gün son kaydedilen stat değerleri (`stat_snapshots`) ile çizgi grafik +
+  güncel statlar için beşgen (radar) grafik.
+- **Rekor listesi:** egzersiz sırasına göre güncel rekorlar, tarih ve kaynak.

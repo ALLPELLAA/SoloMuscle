@@ -8,3 +8,7 @@ export * from './rank';
 export * from './engine';
 export * from './reminders';
 export * from './workout';
+export * from './records';
+export * from './rpe';
+export * from './rest-days';
+export * from './activity';

@@ -20,6 +20,9 @@ import {
   type ExamEvaluation,
   type ExamRank,
 } from './rank';
+import { applyRecord, recordsFromExam, type RecordEvent } from './records';
+import { breakStreak, extendStreak, isRestDay } from './rest-days';
+import { assertValidRpe, updateRpeAverage } from './rpe';
 import { applyStatXp, assertValidBaseline, createPlayer } from './stats';
 import { applyXp } from './xp';
 import {
@@ -40,6 +43,7 @@ export function createInitialState(name: string, baseline: BaselineTest, today: 
     dailyQuest: generateDailyQuest(player, today),
     penaltyQuest: null,
     lastRolloverDay: today,
+    restDays: [],
   };
 }
 
@@ -54,6 +58,8 @@ export function isXpLocked(state: Pick<GameState, 'penaltyQuest'>): boolean {
 
 export type RolloverEvent =
   | { type: 'daily_failed'; quest: Quest; forgiven: boolean }
+  | { type: 'daily_excused'; quest: Quest }
+  | { type: 'streak_broken'; previous: number }
   | { type: 'days_skipped'; days: number }
   | { type: 'penalty_started'; quest: Quest }
   | { type: 'penalty_continues'; quest: Quest }
@@ -91,13 +97,19 @@ export function rolloverDay(state: GameState, today: DayKey): RolloverResult {
   const events: RolloverEvent[] = [];
   const archived: Quest[] = [];
   let missed = false;
+  let breaksStreak = false;
 
   const previous = state.dailyQuest;
   if (previous) {
-    if (previous.status === 'active') {
+    if (previous.status === 'active' && isRestDay(state.restDays, previous.dayKey)) {
+      const excused: Quest = { ...previous, status: 'excused' };
+      events.push({ type: 'daily_excused', quest: excused });
+      archived.push(excused);
+    } else if (previous.status === 'active') {
       const failed: Quest = { ...previous, status: 'failed' };
       const forgiven = previous.dayKey === state.player.createdDay;
       if (!forgiven) missed = true;
+      breaksStreak = true;
       events.push({ type: 'daily_failed', quest: failed, forgiven });
       archived.push(failed);
     } else {
@@ -108,7 +120,14 @@ export function rolloverDay(state: GameState, today: DayKey): RolloverResult {
   const gap = diffDays(state.lastRolloverDay, today);
   if (gap >= 2) {
     missed = true;
+    breaksStreak = true;
     events.push({ type: 'days_skipped', days: gap - 1 });
+  }
+
+  let player = state.player;
+  if (breaksStreak && player.streak.current > 0) {
+    events.push({ type: 'streak_broken', previous: player.streak.current });
+    player = { ...player, streak: breakStreak(player.streak) };
   }
 
   let penaltyQuest = state.penaltyQuest;
@@ -121,16 +140,16 @@ export function rolloverDay(state: GameState, today: DayKey): RolloverResult {
     if (penaltyQuest) {
       events.push({ type: 'penalty_continues', quest: penaltyQuest });
     } else {
-      penaltyQuest = generatePenaltyQuest(state.player, today);
+      penaltyQuest = generatePenaltyQuest(player, today);
       events.push({ type: 'penalty_started', quest: penaltyQuest });
     }
   }
 
-  const dailyQuest = generateDailyQuest(state.player, today);
+  const dailyQuest = generateDailyQuest(player, today);
   events.push({ type: 'new_daily', quest: dailyQuest });
 
   return {
-    state: { ...state, dailyQuest, penaltyQuest, lastRolloverDay: today },
+    state: { ...state, player, dailyQuest, penaltyQuest, lastRolloverDay: today },
     events,
     archived,
     changed: true,
@@ -162,12 +181,19 @@ export interface LogResult {
   state: GameState;
   /** True when XP was locked by an active penalty quest at the start of processing. */
   xpLocked: boolean;
-  /** XP granted per entry (same order as the input). */
+  /** XP granted per entry incl. its record bonus (same order as the input). */
   entryXp: number[];
+  /** Whether each entry set a personal record (first or beaten). */
+  entryRecord: boolean[];
   exerciseXp: number;
   questRewardXp: number;
-  /** exerciseXp + questRewardXp */
+  recordBonusXp: number;
+  /** exerciseXp + questRewardXp + recordBonusXp */
   totalXp: number;
+  /** Record events in order (first records and defeated bosses). */
+  recordEvents: RecordEvent[];
+  /** True when the daily quest was completed and the streak grew. */
+  streakExtended: boolean;
   statXpGained: Partial<Stats>;
   statIncreases: Partial<Stats>;
   fromLevel: number;
@@ -191,16 +217,24 @@ function mergeStats(into: Partial<Stats>, add: Partial<Stats>): void {
  * `rolloverDay` for the current day first so the daily quest is today's.
  */
 export function applyExerciseLogs(state: GameState, entries: ExerciseEntry[], now: number): LogResult {
-  for (const entry of entries) assertValidAmount(entry.exerciseId, entry.amount);
+  for (const entry of entries) {
+    assertValidAmount(entry.exerciseId, entry.amount);
+    assertValidRpe(entry.rpe);
+  }
 
+  const today = state.lastRolloverDay;
   let current = state;
   const result: LogResult = {
     state,
     xpLocked: isXpLocked(state),
     entryXp: [],
+    entryRecord: [],
     exerciseXp: 0,
     questRewardXp: 0,
+    recordBonusXp: 0,
     totalXp: 0,
+    recordEvents: [],
+    streakExtended: false,
     statXpGained: {},
     statIncreases: {},
     fromLevel: state.player.level,
@@ -237,6 +271,8 @@ export function applyExerciseLogs(state: GameState, entries: ExerciseEntry[], no
         questReward = awardedXp;
         result.completedQuests.push(dailyQuest);
         if (lockedAfterPenalty) result.forfeitedQuests.push(dailyQuest);
+        player = { ...player, streak: extendStreak(player.streak, dailyQuest.dayKey) };
+        result.streakExtended = true;
       } else {
         dailyQuest = updated;
       }
@@ -257,15 +293,39 @@ export function applyExerciseLogs(state: GameState, entries: ExerciseEntry[], no
     player = gained.player;
     result.levelsGained += gained.levelsGained;
     result.pointsGained += gained.pointsGained;
-    result.entryXp.push(xp);
+
+    // 5. RPE moving average (not affected by the XP lock).
+    if (entry.rpe !== undefined) {
+      const average = updateRpeAverage(player.rpe[entry.exerciseId], entry.rpe);
+      player = { ...player, rpe: { ...player.rpe, [entry.exerciseId]: average } };
+    }
+
+    // 6. Personal record / boss (§10) — bonus uses the level after this set's XP.
+    const record = applyRecord(player.records, entry, today, player.level, lockedAtStart);
+    let bonus = 0;
+    if (record.event) {
+      player = { ...player, records: record.records };
+      result.recordEvents.push(record.event);
+      bonus = record.event.bonusXp;
+      if (bonus > 0) {
+        const bonusGain = applyXp(player, bonus);
+        player = bonusGain.player;
+        result.levelsGained += bonusGain.levelsGained;
+        result.pointsGained += bonusGain.pointsGained;
+      }
+    }
+
+    result.entryXp.push(xp + bonus);
+    result.entryRecord.push(record.event !== null);
     result.exerciseXp += xp;
     result.questRewardXp += questReward;
+    result.recordBonusXp += bonus;
 
     current = { ...current, player, dailyQuest, penaltyQuest };
   }
 
   result.state = current;
-  result.totalXp = result.exerciseXp + result.questRewardXp;
+  result.totalXp = result.exerciseXp + result.questRewardXp + result.recordBonusXp;
   result.toLevel = current.player.level;
   return result;
 }
@@ -299,8 +359,10 @@ export function submitRankExam(state: GameState, results: BaselineTest, today: D
   const evaluation = evaluateRankExam(target, results);
   const fromLevel = state.player.level;
 
+  const records = recordsFromExam(state.player.records, results, today);
+
   if (!evaluation.passed) {
-    const player = { ...state.player, rankExamCooldownUntil: examCooldownAfterFailure(today) };
+    const player = { ...state.player, records, rankExamCooldownUntil: examCooldownAfterFailure(today) };
     return {
       state: { ...state, player },
       evaluation,
@@ -313,7 +375,7 @@ export function submitRankExam(state: GameState, results: BaselineTest, today: D
   }
 
   const rewardXp = rankUpRewardXp(target);
-  const ranked = { ...state.player, rank: target, rankExamCooldownUntil: null };
+  const ranked = { ...state.player, records, rank: target, rankExamCooldownUntil: null };
   const gained = applyXp(ranked, rewardXp);
   return {
     state: { ...state, player: gained.player },
