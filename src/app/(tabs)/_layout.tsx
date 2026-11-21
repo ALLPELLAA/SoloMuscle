@@ -48,6 +48,7 @@ export default function TabsLayout() {
       />
       <Tabs.Screen name="workout" options={{ title: 'Antrenman', tabBarIcon: tabIcon('barbell-outline') }} />
       <Tabs.Screen name="rank" options={{ title: 'Rank', tabBarIcon: tabIcon('shield-half-outline') }} />
+      <Tabs.Screen name="stats" options={{ title: 'İstatistik', tabBarIcon: tabIcon('stats-chart-outline') }} />
     </Tabs>
   );
 }
