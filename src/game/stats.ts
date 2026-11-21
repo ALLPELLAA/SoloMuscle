@@ -73,7 +73,8 @@ export function initialStatsFromBaseline(test: BaselineTest): Stats {
 }
 
 export function normalizePlayerName(name: string): string {
-  const trimmed = (name ?? '').trim().slice(0, PLAYER_NAME_MAX).trim();
+  // Truncate by code points so emoji / non-BMP characters are never cut in half.
+  const trimmed = Array.from((name ?? '').trim()).slice(0, PLAYER_NAME_MAX).join('').trim();
   return trimmed.length > 0 ? trimmed : DEFAULT_PLAYER_NAME;
 }
 

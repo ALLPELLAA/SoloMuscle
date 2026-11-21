@@ -249,7 +249,7 @@ function parseObjectives(text: string): QuestObjective[] {
     if (typeof o.exerciseId !== 'string' || !isExerciseId(o.exerciseId)) continue;
     objectives.push({
       exerciseId: o.exerciseId,
-      target: toNumber(o.target, 1),
+      target: Math.max(1, toNumber(o.target, 1)),
       progress: toNumber(o.progress),
       note: typeof o.note === 'string' ? o.note : '',
     });
