@@ -107,8 +107,11 @@ const styles = StyleSheet.create({
   input: {
     ...typography.title,
     flex: 1,
+    minWidth: 0,
     color: colors.text,
     paddingVertical: spacing.sm,
+    // Web: hide the browser focus ring (the box itself glows on focus).
+    outlineStyle: 'solid',
     outlineWidth: 0,
   },
   previewRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
