@@ -1,11 +1,5 @@
-import { Screen } from '@/components/screen';
-import { SystemText } from '@/components/system-text';
+import { StatsScreen } from '@/screens/stats/stats-screen';
 
-// PLACEHOLDER — replaced by the stats screen implementation.
-export default function PlaceholderScreen() {
-  return (
-    <Screen>
-      <SystemText>TODO</SystemText>
-    </Screen>
-  );
+export default function StatsRoute() {
+  return <StatsScreen />;
 }

@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { memo, useCallback, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 
 import { SystemText } from '@/components/system-text';
 import { SystemWindow } from '@/components/system-window';
@@ -42,7 +42,7 @@ interface Geometry {
 function computeGeometry(width: number, weeks: number): Geometry {
   const gap = width < 320 ? 2 : 3;
   const available = width - DAY_LABEL_WIDTH - gap * (weeks - 1);
-  const fit = available / weeks;
+  const fit = Math.floor((available / weeks) * 2) / 2;
   if (fit < MIN_CELL) return { cell: MIN_CELL, gap, scroll: true };
   return { cell: Math.min(MAX_CELL, fit), gap, scroll: false };
 }
@@ -51,7 +51,7 @@ function computeGeometry(width: number, weeks: number): Geometry {
 export function ActivityHeatmap({ heatmap, weeks, today, restKinds }: ActivityHeatmapProps) {
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState<DayKey | null>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
   const onLayout = useCallback((event: LayoutChangeEvent) => {
     const next = Math.floor(event.nativeEvent.layout.width);
@@ -82,7 +82,9 @@ export function ActivityHeatmap({ heatmap, weeks, today, restKinds }: ActivityHe
             horizontal
             scrollEnabled={geometry.scroll}
             showsHorizontalScrollIndicator={false}
-            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+            onContentSizeChange={() => {
+              if (geometry.scroll) scrollRef.current?.scrollToEnd({ animated: false });
+            }}
           >
             <HeatGrid
               heatmap={heatmap}
@@ -134,12 +136,13 @@ interface HeatGridProps {
 
 function HeatGrid({ heatmap, cell, gap, today, selected, onSelect }: HeatGridProps) {
   const step = cell + gap;
+  const gridWidth = DAY_LABEL_WIDTH + heatmap.weeks.length * step - gap;
   const showAllDays = cell >= 14;
   const months = monthLabels(heatmap.weeks);
 
   return (
     <View>
-      <View style={[styles.monthRow, { width: DAY_LABEL_WIDTH + heatmap.weeks.length * step }]}>
+      <View style={[styles.monthRow, { width: gridWidth }]}>
         {months.map((m) => (
           <SystemText
             key={m.week}

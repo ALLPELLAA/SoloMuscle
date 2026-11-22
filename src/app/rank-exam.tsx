@@ -1,11 +1,5 @@
-import { Screen } from '@/components/screen';
-import { SystemText } from '@/components/system-text';
+import { RankExamScreen } from '@/screens/rank/rank-exam-screen';
 
-// PLACEHOLDER — replaced by the screen implementation.
-export default function PlaceholderScreen() {
-  return (
-    <Screen>
-      <SystemText>TODO</SystemText>
-    </Screen>
-  );
+export default function RankExamRoute() {
+  return <RankExamScreen />;
 }

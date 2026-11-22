@@ -17,41 +17,51 @@ export interface BossTimeline {
   /** Sequence clock in ms (0 → TOTAL_MS). */
   clock: SharedValue<number>;
   phase: BossPhase;
+  /** True once the whole sequence has played (or was skipped). */
+  done: boolean;
   reduceMotion: boolean;
   /** Jumps straight to the final frame. */
   skip(): void;
 }
 
-/** Drives the boss sequence: one linear clock plus the fight → defeated phase switch. */
+type Timer = ReturnType<typeof setTimeout>;
+
+/** Drives the boss sequence: one linear clock plus the fight → defeated → done switches. */
 export function useBossTimeline(): BossTimeline {
   const reduceMotion = useReducedMotion();
   const clock = useSharedValue(0);
   const [phase, setPhase] = useState<BossPhase>('fight');
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [done, setDone] = useState(false);
+  const timers = useRef<Timer[]>([]);
+
+  const clearTimers = useCallback(() => {
+    for (const timer of timers.current) clearTimeout(timer);
+    timers.current = [];
+  }, []);
 
   useEffect(() => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     clock.set(withTiming(TOTAL_MS, { duration: TOTAL_MS, easing: Easing.linear }));
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      setPhase('defeated');
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => undefined);
-    }, DEFEAT_AT);
+    timers.current = [
+      setTimeout(() => {
+        setPhase('defeated');
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => undefined);
+      }, DEFEAT_AT),
+      setTimeout(() => setDone(true), TOTAL_MS),
+    ];
     return () => {
-      if (timer.current) clearTimeout(timer.current);
+      clearTimers();
       cancelAnimation(clock);
     };
-  }, [clock]);
+  }, [clock, clearTimers]);
 
   const skip = useCallback(() => {
-    if (timer.current) {
-      clearTimeout(timer.current);
-      timer.current = null;
-    }
+    clearTimers();
     cancelAnimation(clock);
     clock.set(TOTAL_MS);
     setPhase('defeated');
-  }, [clock]);
+    setDone(true);
+  }, [clock, clearTimers]);
 
-  return { clock, phase, reduceMotion, skip };
+  return { clock, phase, done, reduceMotion, skip };
 }

@@ -21,7 +21,7 @@ export interface StatRadarProps {
 }
 
 const RINGS = [0.25, 0.5, 0.75, 1] as const;
-const SIDE_LABEL = 74;
+const SIDE_LABEL = 92;
 const MID_LABEL = 96;
 const LABEL_GAP = 8;
 const TOP_SPACE = 40;
@@ -214,6 +214,6 @@ const styles = StyleSheet.create({
   placeholder: { height: 240 },
   dataLayer: { position: 'absolute' },
   label: { position: 'absolute', gap: 0 },
-  labelName: { fontSize: 10, letterSpacing: 0.6 },
+  labelName: { fontSize: 10, letterSpacing: 0.4 },
   labelValue: { fontSize: 16, textShadowRadius: 8, textShadowOffset: { width: 0, height: 0 } },
 });

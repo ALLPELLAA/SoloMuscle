@@ -16,6 +16,7 @@ export const BOSS_COPY = {
   },
   fightTitle: 'BOSS SAVAŞI',
   defeatTitle: 'BOSS YENİLDİ!',
+  guardianLabel: 'Rekor bekçisi',
   hpLabel: 'HP',
   previousLabel: 'Eski rekor',
   newLabel: 'Yeni rekor',
