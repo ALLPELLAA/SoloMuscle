@@ -68,6 +68,7 @@ export interface ExerciseLogRow {
   xp_awarded: number;
   rpe: number | null;
   is_record: number;
+  is_boss?: number;
 }
 
 export interface ExerciseLog {
@@ -81,6 +82,8 @@ export interface ExerciseLog {
   xpAwarded: number;
   rpe: number | null;
   isRecord: boolean;
+  /** The set beat an existing record (boss defeated). */
+  isBoss: boolean;
 }
 
 export interface WorkoutSessionRow {
@@ -302,6 +305,7 @@ export function rowToExerciseLog(row: ExerciseLogRow): ExerciseLog | null {
     xpAwarded: row.xp_awarded,
     rpe: isValidRpe(row.rpe) ? row.rpe : null,
     isRecord: row.is_record === 1,
+    isBoss: row.is_boss === 1,
   };
 }
 

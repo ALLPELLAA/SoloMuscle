@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { colors, spacing } from '@/theme';
@@ -19,19 +19,22 @@ export function Screen({ children, scroll = true, edges = ['top'], contentStyle,
   return (
     <SafeAreaView style={styles.root} edges={edges}>
       <GridBackground />
-      {scroll ? (
-        <ScrollView
-          style={styles.flex}
-          contentContainerStyle={[styles.content, contentStyle]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {children}
-        </ScrollView>
-      ) : (
-        <View style={[styles.flex, styles.content, contentStyle]}>{children}</View>
-      )}
-      {footer ? <View style={styles.footer}>{footer}</View> : null}
+      {/* Edge-to-edge Android no longer resizes the window for the keyboard: pad instead. */}
+      <KeyboardAvoidingView behavior="padding" style={styles.flex}>
+        {scroll ? (
+          <ScrollView
+            style={styles.flex}
+            contentContainerStyle={[styles.content, contentStyle]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {children}
+          </ScrollView>
+        ) : (
+          <View style={[styles.flex, styles.content, contentStyle]}>{children}</View>
+        )}
+        {footer ? <View style={styles.footer}>{footer}</View> : null}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

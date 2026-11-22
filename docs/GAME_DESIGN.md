@@ -259,6 +259,10 @@ tarih tetikleyicileriyle kurulur ve her açılışta / görev tamamlanınca yeni
 - Antrenman = set listesi; her set `{ exerciseId, amount, rpe? }` (tekrar/saniye/dakika; RPE §11).
 - Yeni set girilirken miktar ve RPE, o egzersizin **bir önceki setinden** otomatik doldurulur
   (önce bu antrenmandaki son set, yoksa veritabanındaki son kayıt).
+- Açık antrenman bir **taslak** olarak cihazda saklanır (uygulama kapansa da kaybolmaz). Her set
+  eklendiği anın gününe sayılır: gün dönümünde taslakta önceki güne ait setler varsa, gün kapanmadan
+  önce o güne kaydedilir (XP, görev ilerlemesi, rekorlar); kalan setler taslakta kalır. Ardından §6
+  gün dönümü işlenir.
 - Dinlenme zamanlayıcısı: hazır süreler 30 / 60 / 90 / 120 / 180 sn; kalan süre zaman damgasından
   hesaplanır (`max(0, startedAt + duration − now)`), böylece uygulama arka plana gitse de doğru kalır.
 - Antrenman bitirilince setler sırayla §4 kurallarıyla işlenir; her set için verilen XP kaydedilir.

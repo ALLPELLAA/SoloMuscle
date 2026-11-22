@@ -48,7 +48,8 @@ export function AllocateScreen() {
     try {
       await allocatePoints(draft.allocation);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-      router.replace('/(tabs)');
+      // Pop back to the existing tabs (replace would stack a second tab navigator).
+      router.dismissTo('/(tabs)');
     } catch (err) {
       setFrozen(null);
       setSubmitError(err instanceof Error ? err.message : 'Puanlar kaydedilemedi.');

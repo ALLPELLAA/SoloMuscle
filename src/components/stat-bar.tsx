@@ -22,17 +22,25 @@ export function StatBar({ stat, value, statXp, delta }: StatBarProps) {
     <View style={styles.root} accessible accessibilityLabel={`${STAT_LABELS[stat]} ${value}`}>
       <View style={styles.row}>
         <View style={[styles.dot, { backgroundColor: color, boxShadow: `0 0 6px ${color}` }]} />
-        <SystemText variant="heading" style={styles.label}>
+        <SystemText
+          variant="heading"
+          style={styles.label}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+        >
           {STAT_LABELS[stat].toLocaleUpperCase('tr-TR')}
         </SystemText>
-        {delta ? (
-          <SystemText variant="mono" tone="success" glow>
-            {`+${delta}`}
+        <View style={styles.valueGroup}>
+          {delta ? (
+            <SystemText variant="mono" tone="success" glow>
+              {`+${delta}`}
+            </SystemText>
+          ) : null}
+          <SystemText variant="monoLarge" style={{ color }}>
+            {String(value + (delta ?? 0))}
           </SystemText>
-        ) : null}
-        <SystemText variant="monoLarge" style={{ color }}>
-          {String(value + (delta ?? 0))}
-        </SystemText>
+        </View>
       </View>
       {statXp !== undefined ? (
         <View style={styles.xpRow}>
@@ -48,7 +56,8 @@ const styles = StyleSheet.create({
   root: { gap: spacing.xs },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  label: { flex: 1 },
+  label: { flex: 1, flexShrink: 1, minWidth: 0 },
+  valueGroup: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs, flexShrink: 0 },
   xpRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   bar: { flex: 1 },
 });

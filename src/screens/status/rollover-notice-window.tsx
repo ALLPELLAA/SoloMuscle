@@ -22,7 +22,8 @@ function headlineFor(notice: RolloverNotice): string {
   if (notice.daysSkipped > 0) return `${notice.daysSkipped} GÜN ATLANDI`;
   if (notice.failedDaily) return 'GÖREV KAÇIRILDI';
   if (notice.excusedDaily) return 'DİNLENME GÜNÜ TAMAMLANDI';
-  return 'SERİ SIFIRLANDI';
+  if (notice.streakLost > 0) return 'SERİ SIFIRLANDI';
+  return 'YENİ GÜN BAŞLADI';
 }
 
 function linesFor(notice: RolloverNotice): NoticeLine[] {
@@ -52,6 +53,12 @@ function linesFor(notice: RolloverNotice): NoticeLine[] {
     lines.push({
       icon: 'lock-closed-outline',
       text: 'Önceki Ceza Görevi hâlâ tamamlanmadı. XP kilidi devam ediyor.',
+    });
+  }
+  if (notice.autoSavedSets > 0) {
+    lines.push({
+      icon: 'save-outline',
+      text: `Gece yarısından önce eklenen ${notice.autoSavedSets} set önceki güne kaydedildi.`,
     });
   }
   if (notice.streakLost > 0) {

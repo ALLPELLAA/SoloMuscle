@@ -20,7 +20,7 @@ export const colors = {
 
   text: '#E6F4FF',
   textSecondary: '#8AA9C7',
-  textMuted: '#4F6A86',
+  textMuted: '#6A87A5',
 
   danger: '#FF3B5C',
   dangerDim: 'rgba(255, 59, 92, 0.35)',

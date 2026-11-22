@@ -30,7 +30,8 @@ export function recordBonusXp(level: number): number {
   return 30 + 10 * level;
 }
 
-const BASELINE_EXERCISES: readonly { key: keyof BaselineTest; exerciseId: ExerciseId }[] = [
+/** Baseline/exam metric → exercise mapping. */
+export const BASELINE_EXERCISES: readonly { key: keyof BaselineTest; exerciseId: ExerciseId }[] = [
   { key: 'pushups', exerciseId: 'pushup' },
   { key: 'situps', exerciseId: 'situp' },
   { key: 'squats', exerciseId: 'squat' },
@@ -45,6 +46,18 @@ export function initialRecordsFromBaseline(baseline: BaselineTest, dayKey: DayKe
     if (amount > 0) records[exerciseId] = { amount, dayKey, source: 'baseline', bonusDay: null };
   }
   return records;
+}
+
+/**
+ * Players created before records existed (schema v1) have no records: seed them from the
+ * onboarding test (docs §10). Returns the same player when nothing changes.
+ */
+export function withBaselineRecords<P extends { records: PersonalRecords; baseline: BaselineTest; createdDay: DayKey }>(
+  player: P,
+): P {
+  if (Object.keys(player.records).length > 0) return player;
+  const records = initialRecordsFromBaseline(player.baseline, player.createdDay);
+  return Object.keys(records).length > 0 ? { ...player, records } : player;
 }
 
 export interface RecordEvent {

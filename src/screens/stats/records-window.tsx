@@ -111,7 +111,7 @@ export interface BossLogWindowProps {
 
 /** Latest record-setting sets ("Son yenilen bosslar"). */
 export function BossLogWindow({ logs }: BossLogWindowProps) {
-  const rows = logs.filter((log) => log.isRecord);
+  const rows = logs.filter((log) => log.isBoss);
   return (
     <SystemWindow
       title="Son Yenilen Bosslar"

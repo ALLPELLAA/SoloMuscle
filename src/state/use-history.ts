@@ -10,6 +10,7 @@ import {
   listLogsForDay,
   listRankExams,
   listRecentSessions,
+  listBossLogs,
   listRecordLogs,
   listSessionLogs,
   listStatSnapshots,
@@ -72,6 +73,11 @@ export function useStatSnapshots(limit = 60): StatSnapshot[] {
 
 export function useRecordLogs(limit = 30): ExerciseLog[] {
   return useQuery((db) => listRecordLogs(db, limit), [], [limit]);
+}
+
+/** Defeated bosses only (sets that beat an existing record; first records excluded). */
+export function useBossLogs(limit = 30): ExerciseLog[] {
+  return useQuery((db) => listBossLogs(db, limit), [], [limit]);
 }
 
 /** Activity heatmap for the last `weeks` weeks ending today (docs §14). */

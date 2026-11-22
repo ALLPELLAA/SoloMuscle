@@ -1,8 +1,18 @@
-import { DarkTheme, Stack, ThemeProvider, usePathname, useRouter, type Theme } from 'expo-router';
+import {
+  DarkTheme,
+  Stack,
+  ThemeProvider,
+  usePathname,
+  useRouter,
+  type ErrorBoundaryProps,
+  type Theme,
+} from 'expo-router';
 import { SQLiteProvider } from 'expo-sqlite';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+
+import { SystemErrorView } from '@/components/system-error-view';
 
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
 import { GameProvider, useGame } from '@/state/game-provider';
@@ -23,15 +33,31 @@ const navTheme: Theme = {
   },
 };
 
-export default function RootLayout() {
+/** Render errors anywhere below the root: themed Turkish error screen instead of a crash. */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return (
     <ThemeProvider value={navTheme}>
       <StatusBar style="light" />
-      <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrateDbIfNeeded}>
-        <GameProvider>
-          <RootNavigator />
-        </GameProvider>
-      </SQLiteProvider>
+      <SystemErrorView message="Beklenmeyen bir hata oluştu." detail={error.message} onRetry={retry} />
+    </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  // Opening/migrating the database can fail (e.g. a downgrade): show it instead of crashing.
+  const [dbError, setDbError] = useState<Error | null>(null);
+  return (
+    <ThemeProvider value={navTheme}>
+      <StatusBar style="light" />
+      {dbError ? (
+        <SystemErrorView message="Veriler yüklenemedi." detail={dbError.message} />
+      ) : (
+        <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrateDbIfNeeded} onError={setDbError}>
+          <GameProvider>
+            <RootNavigator />
+          </GameProvider>
+        </SQLiteProvider>
+      )}
     </ThemeProvider>
   );
 }

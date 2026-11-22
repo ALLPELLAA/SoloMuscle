@@ -3,6 +3,7 @@ import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
 import type { ComponentProps } from 'react';
 import type { ColorValue } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useGame } from '@/state/game-provider';
 import { colors, fonts } from '@/theme';
@@ -17,6 +18,9 @@ function tabIcon(name: IconName) {
 
 export default function TabsLayout() {
   const { status, xpLocked } = useGame();
+  // Android draws edge-to-edge: the tab bar pads itself by the bottom inset inside its height,
+  // so the inset must be added to the height (docs: react-navigation BottomTabBar).
+  const insets = useSafeAreaInsets();
   if (status === 'onboarding') return <Redirect href="/onboarding" />;
 
   return (
@@ -29,10 +33,10 @@ export default function TabsLayout() {
           backgroundColor: colors.backgroundAlt,
           borderTopColor: colors.neonDim,
           borderTopWidth: 1,
-          height: 64,
+          height: 58 + insets.bottom,
           paddingTop: 6,
         },
-        tabBarLabelStyle: { fontFamily: fonts.condensed, fontWeight: '700', letterSpacing: 1, fontSize: 11 },
+        tabBarLabelStyle: { fontFamily: fonts.condensed, fontWeight: '700', letterSpacing: 0, fontSize: 11 },
         sceneStyle: { backgroundColor: colors.background },
       }}
     >

@@ -356,6 +356,7 @@ describe('exercise logs', () => {
       xpAwarded: 23,
       rpe: 8,
       isRecord: true,
+      isBoss: false, // no is_boss column value (pre-migration-3 row) → not a boss
     });
   });
 

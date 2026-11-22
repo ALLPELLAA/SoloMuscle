@@ -185,6 +185,8 @@ export interface LogResult {
   entryXp: number[];
   /** Whether each entry set a personal record (first or beaten). */
   entryRecord: boolean[];
+  /** Whether each entry beat an existing record (boss defeated; first records are not bosses). */
+  entryBoss: boolean[];
   exerciseXp: number;
   questRewardXp: number;
   recordBonusXp: number;
@@ -229,6 +231,7 @@ export function applyExerciseLogs(state: GameState, entries: ExerciseEntry[], no
     xpLocked: isXpLocked(state),
     entryXp: [],
     entryRecord: [],
+    entryBoss: [],
     exerciseXp: 0,
     questRewardXp: 0,
     recordBonusXp: 0,
@@ -317,6 +320,7 @@ export function applyExerciseLogs(state: GameState, entries: ExerciseEntry[], no
 
     result.entryXp.push(xp + bonus);
     result.entryRecord.push(record.event !== null);
+    result.entryBoss.push(record.event?.boss === true);
     result.exerciseXp += xp;
     result.questRewardXp += questReward;
     result.recordBonusXp += bonus;

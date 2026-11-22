@@ -7,7 +7,13 @@ import { buildHeatmap, quantile, rawXpByDay, weekdayIndex } from './activity';
 import { addDays } from './date';
 import { applyExerciseLogs, createInitialState, rolloverDay, submitRankExam } from './engine';
 import { dailyTargetBreakdown, describeDailyTarget, generateDailyQuest, generatePenaltyQuest } from './quests';
-import { applyRecord, initialRecordsFromBaseline, recordBonusXp, recordsFromExam } from './records';
+import {
+  applyRecord,
+  initialRecordsFromBaseline,
+  recordBonusXp,
+  recordsFromExam,
+  withBaselineRecords,
+} from './records';
 import { buildReminderPlan } from './reminders';
 import {
   REST_DAY_LIMIT,
@@ -290,5 +296,34 @@ describe('§14 heatmap', () => {
     expect(map.weeks[1][1].questDone).toBe(true);
     expect(map.activeDays).toBe(4);
     expect(map.totalValue).toBe(170);
+  });
+});
+
+describe('review fixes', () => {
+  test('entryBoss separates defeated bosses from first records (§10)', () => {
+    // pushup record 15 from the baseline → 16 beats it; burpee has no record → first record only.
+    const result = applyExerciseLogs(
+      fresh(),
+      [
+        { exerciseId: 'burpee', amount: 5 },
+        { exerciseId: 'pushup', amount: 16 },
+      ],
+      1,
+    );
+    expect(result.entryRecord).toEqual([true, true]);
+    expect(result.entryBoss).toEqual([false, true]);
+  });
+
+  test('withBaselineRecords seeds records for players created before records existed', () => {
+    const player: Player = { ...fresh().player, records: {} };
+    const seeded = withBaselineRecords(player);
+    expect(seeded.records.pushup).toEqual({ amount: 15, dayKey: DAY0, source: 'baseline', bonusDay: null });
+    expect(Object.keys(seeded.records).sort()).toEqual(['plank', 'pushup', 'situp', 'squat']);
+    // existing records are left alone (same instance)
+    const withRecords = fresh().player;
+    expect(withBaselineRecords(withRecords)).toBe(withRecords);
+    // an all-zero baseline has nothing to seed
+    const zero = { ...player, baseline: { pushups: 0, situps: 0, squats: 0, plankSeconds: 0 } };
+    expect(withBaselineRecords(zero)).toBe(zero);
   });
 });

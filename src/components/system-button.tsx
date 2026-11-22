@@ -66,8 +66,10 @@ export function SystemButton({
         {loading ? <ActivityIndicator size="small" color={solid ? colors.background : t.main} /> : icon}
         <SystemText
           variant={size === 'sm' ? 'label' : 'heading'}
-          style={{ color: solid ? colors.background : t.main }}
+          style={[styles.label, { color: solid ? colors.background : t.main }]}
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
         >
           {label.toLocaleUpperCase('tr-TR')}
         </SystemText>
@@ -84,7 +86,8 @@ const styles = StyleSheet.create({
   },
   md: { minHeight: 52, paddingHorizontal: spacing.xl, paddingVertical: spacing.md },
   sm: { minHeight: 40, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, maxWidth: '100%' },
+  label: { flexShrink: 1, minWidth: 0 },
   solidPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   disabled: { opacity: 0.4 },
 });

@@ -6,7 +6,7 @@ import { Screen } from '@/components/screen';
 import { SystemText } from '@/components/system-text';
 import { EXERCISE_IDS, HEATMAP_WEEKS, type DayKey, type RestDayKind } from '@/game';
 import { useGame } from '@/state/game-provider';
-import { useActivityHeatmap, useRecordLogs, useStatSnapshots } from '@/state/use-history';
+import { useActivityHeatmap, useBossLogs, useStatSnapshots } from '@/state/use-history';
 import { colors, spacing } from '@/theme';
 
 import { ActivityHeatmap } from './activity-heatmap';
@@ -20,7 +20,7 @@ export function StatsScreen() {
   const { state, today } = useGame();
   const heatmap = useActivityHeatmap(HEATMAP_WEEKS);
   const snapshots = useStatSnapshots(60);
-  const recordLogs = useRecordLogs(10);
+  const recordLogs = useBossLogs(10);
 
   const restDays = state?.restDays;
   const restKinds = useMemo(() => {

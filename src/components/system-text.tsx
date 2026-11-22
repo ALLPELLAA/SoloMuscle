@@ -1,4 +1,4 @@
-import { StyleSheet, Text, type TextProps, type TextStyle } from 'react-native';
+import { Text, type TextProps, type TextStyle } from 'react-native';
 
 import { colors, textGlow, typography, type Tone } from '@/theme';
 
@@ -10,7 +10,6 @@ export interface SystemTextProps extends TextProps {
   tone?: Tone | 'default' | 'secondary' | 'muted';
   glow?: boolean;
   align?: TextStyle['textAlign'];
-  uppercase?: boolean;
 }
 
 const toneTextColor: Record<NonNullable<SystemTextProps['tone']>, string> = {
@@ -29,13 +28,12 @@ const glowFor: Partial<Record<NonNullable<SystemTextProps['tone']>, TextStyle>> 
   gold: textGlow.gold,
 };
 
-/** Themed text. Defaults to `body` / default color. */
+/** Themed text. Defaults to `body` / default color. Uppercase with toLocaleUpperCase('tr-TR'). */
 export function SystemText({
   variant = 'body',
   tone = 'default',
   glow = false,
   align,
-  uppercase = false,
   style,
   ...rest
 }: SystemTextProps) {
@@ -47,13 +45,8 @@ export function SystemText({
         { color: toneTextColor[tone] },
         glow && glowFor[tone],
         align && { textAlign: align },
-        uppercase && styles.uppercase,
         style,
       ]}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  uppercase: { textTransform: 'uppercase' },
-});

@@ -145,6 +145,8 @@ export interface WorkoutRecord {
   entryXp: number[];
   /** Per entry: did it set a personal record? */
   entryRecord: boolean[];
+  /** Per entry: did it beat an existing record (boss defeated)? */
+  entryBoss: boolean[];
   xpLocked: boolean;
 }
 
@@ -169,8 +171,9 @@ export async function saveWorkout(
     for (let i = 0; i < workout.entries.length; i++) {
       const entry = workout.entries[i];
       await db.runAsync(
-        `INSERT INTO exercise_logs (session_id, exercise_id, amount, set_index, day_key, created_at, xp_awarded, rpe, is_record)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO exercise_logs
+           (session_id, exercise_id, amount, set_index, day_key, created_at, xp_awarded, rpe, is_record, is_boss)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         sessionId,
         entry.exerciseId,
         entry.amount,
@@ -180,6 +183,7 @@ export async function saveWorkout(
         workout.entryXp[i] ?? 0,
         entry.rpe ?? null,
         workout.entryRecord[i] ? 1 : 0,
+        workout.entryBoss[i] ? 1 : 0,
       );
     }
     await writeState(db, state, [], workout.endedAt);
@@ -318,6 +322,15 @@ export async function listStatSnapshots(db: SQLiteDatabase, limit = 60): Promise
     limit,
   );
   return rows.map(rowToSnapshot).reverse();
+}
+
+/** Sets that beat an existing record (defeated bosses), newest first. First records are excluded. */
+export async function listBossLogs(db: SQLiteDatabase, limit = 30): Promise<ExerciseLog[]> {
+  const rows = await db.getAllAsync<ExerciseLogRow>(
+    'SELECT * FROM exercise_logs WHERE is_boss = 1 ORDER BY created_at DESC, set_index DESC LIMIT ?',
+    limit,
+  );
+  return rows.map(rowToExerciseLog).filter((log): log is ExerciseLog => log !== null);
 }
 
 /** Sets that created or beat a personal record, newest first. */

@@ -99,6 +99,10 @@ export const MIGRATIONS: readonly string[] = [
     stats TEXT NOT NULL
   );
   `,
+  // 3 — separate "boss defeated" from "first record" in the log (docs §10)
+  `
+  ALTER TABLE exercise_logs ADD COLUMN is_boss INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

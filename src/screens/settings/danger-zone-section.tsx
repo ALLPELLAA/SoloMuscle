@@ -24,6 +24,8 @@ export function DangerZoneSection() {
     try {
       await resetProgress();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
+      // Clear the stack first so Android back cannot return to the old tabs.
+      if (router.canDismiss()) router.dismissAll();
       router.replace('/onboarding');
     } catch {
       setError('Sıfırlama başarısız oldu. Lütfen tekrar dene.');
