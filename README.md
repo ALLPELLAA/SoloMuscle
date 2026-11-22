@@ -9,7 +9,14 @@ RPG "sistem" arayüzlü, **tamamen internetsiz** çalışan Android odaklı fitn
 - **Günlük görev:** seviye ve statlara göre ölçeklenir, 00:00'da yenilenir. Kaçırılırsa ertesi gün
   **Ceza Görevi** açılır; bitene kadar XP kazanılmaz.
 - **Rank sınavı (E→D→C→B→A→S):** belirli level'da açılır, gerçek performans eşikleriyle geçilir.
-- **Antrenman kaydı:** set / tekrar / süre girişi, dinlenme zamanlayıcısı.
+- **Antrenman kaydı:** set / tekrar / süre girişi, dinlenme zamanlayıcısı; bir önceki setin değerleri
+  otomatik dolar, her sete **RPE 1–10** zorluk girilir.
+- **Kişisel rekor = Boss:** bir hareketin rekorunu geçince "BOSS YENİLDİ" penceresi + bonus XP
+  (`30 + 10·level`, hareket başına günde bir kez).
+- **Uyarlanabilir hedefler:** RPE ortalamasına göre bir sonraki günlük hedef ±%20'ye kadar ayarlanır;
+  her hedefin altında sayının nereden geldiğini anlatan kısa bir sistem notu vardır.
+- **Dinlenme / hasta günü:** o gün tamamlanmayan görev ceza açmaz ve seri bozulmaz (son 7 günde en fazla 3).
+- **İstatistik:** GitHub tarzı aktivite ısı haritası, stat beşgeni + stat geçmişi grafikleri, rekor listesi.
 - **Veri:** `expo-sqlite` (cihazda). **Bildirim:** `expo-notifications` ile günlük yerel hatırlatma.
 
 Oyun kuralları ve tüm formüller: [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md) ·
@@ -84,7 +91,7 @@ npx expo export -p android   # Android bundle derleme kontrolü
 
 ```
 src/
-├── app/            # Expo Router route'ları (onboarding, sekmeler, level-up, allocate, rank-exam, settings)
+├── app/            # Expo Router route'ları (onboarding, 5 sekme, level-up, boss, allocate, rank-exam, settings)
 ├── game/           # SAF TypeScript oyun mantığı + unit testler (XP, statlar, görev üretici, rank, gün dönümü)
 ├── db/             # expo-sqlite şema, migrasyon, repository
 ├── notifications/  # yerel hatırlatma servisi
