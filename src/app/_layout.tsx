@@ -10,7 +10,7 @@ import {
 import { SQLiteProvider } from 'expo-sqlite';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { SystemErrorView } from '@/components/system-error-view';
 
@@ -46,13 +46,17 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 export default function RootLayout() {
   // Opening/migrating the database can fail (e.g. a downgrade): show it instead of crashing.
   const [dbError, setDbError] = useState<Error | null>(null);
+  // expo-sqlite calls onError during its render: defer the parent state update.
+  const handleDbError = useCallback((error: Error) => {
+    queueMicrotask(() => setDbError(error));
+  }, []);
   return (
     <ThemeProvider value={navTheme}>
       <StatusBar style="light" />
       {dbError ? (
         <SystemErrorView message="Veriler yüklenemedi." detail={dbError.message} />
       ) : (
-        <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrateDbIfNeeded} onError={setDbError}>
+        <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrateDbIfNeeded} onError={handleDbError}>
           <GameProvider>
             <RootNavigator />
           </GameProvider>

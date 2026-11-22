@@ -67,7 +67,7 @@ export function WorkoutScreen() {
 }
 
 function WorkoutLogger({ state }: { state: GameState }) {
-  const { today, xpLocked, logWorkout } = useGame();
+  const { today, xpLocked, finishWorkout } = useGame();
   const params = useLocalSearchParams<{ exercise?: string }>();
   const paramId = parseExerciseParam(params.exercise);
   const session = useWorkoutSession();
@@ -136,11 +136,15 @@ function WorkoutLogger({ state }: { state: GameState }) {
     if (entries.length === 0 || busy) return;
     setBusy(true);
     setFinishError(null);
-    const setCount = entries.length;
     try {
-      const result = await logWorkout(entries, session.startedAt ?? Date.now());
-      setFinished({ result, setCount });
-      session.clear();
+      // The provider logs whatever is in the persisted draft after any pending day change,
+      // so sets that were already saved to the previous day at midnight are never logged twice.
+      const outcome = await finishWorkout();
+      if (!outcome) {
+        setFinishError('Kaydedilecek set kalmadı: setler gece yarısında önceki güne kaydedildi.');
+        return;
+      }
+      setFinished({ result: outcome.result, setCount: outcome.setCount });
       rest.skip();
       resetDraft();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);

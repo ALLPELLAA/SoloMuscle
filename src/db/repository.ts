@@ -150,11 +150,21 @@ export interface WorkoutRecord {
   xpLocked: boolean;
 }
 
-/** Atomically stores a finished workout and the resulting game state. */
+/** A settings row written in the same transaction (e.g. the updated workout draft). */
+export interface SettingWrite {
+  key: string;
+  value: string;
+}
+
+/**
+ * Atomically stores a finished workout, the resulting game state and optional settings
+ * rows (the workout draft), so a crash can never leave logged sets in the draft.
+ */
 export async function saveWorkout(
   db: SQLiteDatabase,
   state: GameState,
   workout: WorkoutRecord,
+  settings: SettingWrite[] = [],
 ): Promise<number> {
   let sessionId = 0;
   await db.withTransactionAsync(async () => {
@@ -187,6 +197,7 @@ export async function saveWorkout(
       );
     }
     await writeState(db, state, [], workout.endedAt);
+    for (const { key, value } of settings) await upsertSetting(db, key, value);
   });
   return sessionId;
 }
@@ -252,12 +263,16 @@ export async function getSetting(db: SQLiteDatabase, key: string): Promise<strin
   return row?.value ?? null;
 }
 
-export async function setSetting(db: SQLiteDatabase, key: string, value: string): Promise<void> {
+async function upsertSetting(db: SQLiteDatabase, key: string, value: string): Promise<void> {
   await db.runAsync(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
     key,
     value,
   );
+}
+
+export async function setSetting(db: SQLiteDatabase, key: string, value: string): Promise<void> {
+  await upsertSetting(db, key, value);
 }
 
 /** Stores today's rest-day mark (kind) or removes it (null) together with the new state. */

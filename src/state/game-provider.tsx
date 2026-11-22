@@ -139,6 +139,11 @@ export interface GameContextValue {
   /** Marks today as rest/sick day: no penalty, streak kept (docs §13). */
   markRestDay(kind: RestDayKind): Promise<void>;
   unmarkRestDay(): Promise<void>;
+  /**
+   * Logs the current workout draft (after applying any pending day change) and clears it.
+   * Resolves to null when nothing is left to log.
+   */
+  finishWorkout(): Promise<{ result: LogResult; setCount: number } | null>;
   addDraftSet(set: Pick<DraftSet, 'exerciseId' | 'amount' | 'rpe'>): Promise<void>;
   removeDraftSet(key: number): Promise<void>;
   clearDraft(): Promise<void>;
@@ -288,13 +293,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
     await syncReminders(plan);
   }, [now]);
 
+  /** In-memory draft update; call only after the draft is safely stored. */
+  const applyDraft = useCallback((next: WorkoutDraft) => {
+    draftRef.current = next;
+    setWorkoutDraft(next);
+  }, []);
+
   const persistDraft = useCallback(
     async (next: WorkoutDraft) => {
-      draftRef.current = next;
-      setWorkoutDraft(next);
       await setSetting(db, DRAFT_KEY, JSON.stringify(next));
+      applyDraft(next);
     },
-    [db],
+    [applyDraft, db],
   );
 
   /**
@@ -302,18 +312,31 @@ export function GameProvider({ children }: { children: ReactNode }) {
    * the resulting popups (bosses, level-up). Caller must hold the `exclusive` lock.
    */
   const recordSets = useCallback(
-    async (current: GameState, entries: ExerciseEntry[], startedAt: number, endedAt: number): Promise<LogResult> => {
+    async (
+      current: GameState,
+      entries: ExerciseEntry[],
+      startedAt: number,
+      endedAt: number,
+      /** New workout draft, stored in the same transaction as the logged sets. */
+      nextDraft?: WorkoutDraft,
+    ): Promise<LogResult> => {
       const result = applyExerciseLogs(current, entries, endedAt);
-      await saveWorkout(db, result.state, {
-        dayKey: current.lastRolloverDay,
-        startedAt,
-        endedAt,
-        entries,
-        entryXp: result.entryXp,
-        entryRecord: result.entryRecord,
-        entryBoss: result.entryBoss,
-        xpLocked: result.xpLocked,
-      });
+      await saveWorkout(
+        db,
+        result.state,
+        {
+          dayKey: current.lastRolloverDay,
+          startedAt,
+          endedAt,
+          entries,
+          entryXp: result.entryXp,
+          entryRecord: result.entryRecord,
+          entryBoss: result.entryBoss,
+          xpLocked: result.xpLocked,
+        },
+        nextDraft ? [{ key: DRAFT_KEY, value: JSON.stringify(nextDraft) }] : [],
+      );
+      if (nextDraft) applyDraft(nextDraft);
       commit(result.state);
       const bosses = result.recordEvents.filter((e) => e.boss);
       if (bosses.length > 0) setBossQueue((prev) => [...prev, ...bosses]);
@@ -323,7 +346,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
       return result;
     },
-    [commit, db],
+    [applyDraft, commit, db],
   );
 
   /** Applies the day rollover for the current (possibly simulated) day and persists it. */
@@ -340,9 +363,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (compareDayKeys(todayKey, current.lastRolloverDay) > 0 && draft.sets.length > 0) {
       const { closing, remaining } = splitSetsAtDayChange(draft.sets, current.lastRolloverDay);
       if (closing.length > 0) {
-        await recordSets(current, closing.map(draftEntry), draft.startedAt ?? closing[0].at, closing[closing.length - 1].at);
+        // Logged sets and the shortened draft are stored atomically (no double logging after a crash).
+        await recordSets(current, closing.map(draftEntry), draft.startedAt ?? closing[0].at, closing[closing.length - 1].at, {
+          ...draft,
+          sets: remaining,
+          startedAt: remaining[0]?.at ?? null,
+        });
         current = stateRef.current ?? current;
-        await persistDraft({ ...draft, sets: remaining, startedAt: remaining[0]?.at ?? null });
         autoSavedSets = closing.length;
       }
     }
@@ -354,7 +381,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const notice = noticeFromEvents(result.events, autoSavedSets);
     if (notice) setRolloverNotice(notice);
     await scheduleReminders();
-  }, [commit, db, now, persistDraft, recordSets, scheduleReminders]);
+  }, [commit, db, now, recordSets, scheduleReminders]);
 
   // Initial load.
   useEffect(() => {
@@ -456,6 +483,30 @@ export function GameProvider({ children }: { children: ReactNode }) {
         const result = await recordSets(current, entries, startedAt ?? endedAt, endedAt);
         if (result.completedQuests.length > 0) await scheduleReminders();
         return result;
+      }),
+    [exclusive, now, recordSets, runRollover, scheduleReminders],
+  );
+
+  const finishWorkout = useCallback(
+    () =>
+      exclusive(async () => {
+        // Roll over first: sets from a previous day are saved to that day and leave the draft,
+        // so only what is still in the draft afterwards is logged here (never twice).
+        await runRollover();
+        const current = stateRef.current;
+        if (!current) throw new Error('Oyuncu bulunamadı.');
+        const draft = draftRef.current;
+        if (draft.sets.length === 0) return null;
+        const endedAt = now();
+        const result = await recordSets(
+          current,
+          draft.sets.map(draftEntry),
+          draft.startedAt ?? draft.sets[0].at,
+          endedAt,
+          { ...EMPTY_DRAFT, nextKey: draft.nextKey },
+        );
+        if (result.completedQuests.length > 0) await scheduleReminders();
+        return { result, setCount: draft.sets.length };
       }),
     [exclusive, now, recordSets, runRollover, scheduleReminders],
   );
@@ -660,6 +711,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       acknowledgeBoss,
       markRestDay,
       unmarkRestDay,
+      finishWorkout,
       addDraftSet,
       removeDraftSet,
       clearDraft,
@@ -691,6 +743,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       acknowledgeBoss,
       markRestDay,
       unmarkRestDay,
+      finishWorkout,
       addDraftSet,
       removeDraftSet,
       clearDraft,

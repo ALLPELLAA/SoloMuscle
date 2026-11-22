@@ -57,6 +57,8 @@ export function NumberStepper({
   };
 
   const bump = (delta: number) => onChange(clamp(value + delta, min, max));
+  // Distinct labels per stepper so screen readers can tell e.g. hour and minute apart.
+  const name = accessibilityLabel ?? label ?? 'Değer';
 
   return (
     <View style={styles.root}>
@@ -66,7 +68,7 @@ export function NumberStepper({
         </SystemText>
       ) : null}
       <View style={styles.row}>
-        <StepButton symbol="−" onPress={() => bump(-step)} disabled={value <= min} label="Azalt" />
+        <StepButton symbol="−" onPress={() => bump(-step)} disabled={value <= min} label={`${name} azalt`} />
         <View style={styles.valueBox}>
           <TextInput
             value={text}
@@ -86,7 +88,7 @@ export function NumberStepper({
             </SystemText>
           ) : null}
         </View>
-        <StepButton symbol="+" onPress={() => bump(step)} disabled={value >= max} label="Artır" />
+        <StepButton symbol="+" onPress={() => bump(step)} disabled={value >= max} label={`${name} artır`} />
       </View>
     </View>
   );

@@ -103,6 +103,24 @@ export const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE exercise_logs ADD COLUMN is_boss INTEGER NOT NULL DEFAULT 0;
   `,
+  // 4 — backfill is_boss for record rows logged before migration 3: a record row beat an
+  // existing record if an earlier log of that exercise exists, or the onboarding test
+  // seeded a record for it (baseline value > 0).
+  `
+  UPDATE exercise_logs SET is_boss = 1
+  WHERE is_record = 1 AND is_boss = 0 AND (
+    EXISTS (
+      SELECT 1 FROM exercise_logs AS earlier
+      WHERE earlier.exercise_id = exercise_logs.exercise_id
+        AND (earlier.created_at < exercise_logs.created_at
+          OR (earlier.created_at = exercise_logs.created_at AND earlier.set_index < exercise_logs.set_index))
+    )
+    OR (exercise_id = 'pushup' AND COALESCE((SELECT json_extract(baseline, '$.pushups') FROM player WHERE id = 1), 0) > 0)
+    OR (exercise_id = 'situp' AND COALESCE((SELECT json_extract(baseline, '$.situps') FROM player WHERE id = 1), 0) > 0)
+    OR (exercise_id = 'squat' AND COALESCE((SELECT json_extract(baseline, '$.squats') FROM player WHERE id = 1), 0) > 0)
+    OR (exercise_id = 'plank' AND COALESCE((SELECT json_extract(baseline, '$.plankSeconds') FROM player WHERE id = 1), 0) > 0)
+  );
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
