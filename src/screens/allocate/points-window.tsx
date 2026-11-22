@@ -82,7 +82,15 @@ const gold = toneColors.gold;
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  count: { ...typography.display, fontFamily: fonts.mono, letterSpacing: 0, minWidth: 56, textAlign: 'center' },
+  count: {
+    ...typography.display,
+    fontFamily: fonts.mono,
+    letterSpacing: 0,
+    lineHeight: 48,
+    includeFontPadding: false,
+    minWidth: 56,
+    textAlign: 'center',
+  },
   side: { flex: 1, gap: spacing.sm },
   pips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingLeft: spacing.xxs },
   pip: { width: 11, height: 11, borderWidth: 1, borderRadius: radii.sm / 2, transform: [{ rotate: '45deg' }] },

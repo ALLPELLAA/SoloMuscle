@@ -58,14 +58,15 @@ export function LevelTransition({ from, to, animate }: LevelTransitionProps) {
 }
 
 const gold = toneColors.gold;
+const BOX_HEIGHT = 58;
 
 const styles = StyleSheet.create({
   root: { gap: spacing.sm, alignItems: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   box: {
     minWidth: 76,
+    height: BOX_HEIGHT,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
     borderRadius: radii.sm,
     borderWidth: 1,
     alignItems: 'center',
@@ -74,5 +75,5 @@ const styles = StyleSheet.create({
   fromBox: { borderColor: colors.neonFaint, backgroundColor: colors.backgroundAlt },
   toBox: { borderColor: colors.neonDim, backgroundColor: colors.neonFaint },
   toBoxReached: { borderColor: gold.main, backgroundColor: gold.faint, boxShadow: gold.glow },
-  toValue: { ...typography.display, fontFamily: fonts.mono, letterSpacing: 0 },
+  toValue: { ...typography.display, fontFamily: fonts.mono, letterSpacing: 0, lineHeight: 48, includeFontPadding: false },
 });

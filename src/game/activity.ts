@@ -5,14 +5,14 @@ import type { DayKey } from './types';
 
 export const HEATMAP_WEEKS = 20;
 
+/** One logged set (amount in the exercise's unit). */
 export interface DailyVolumeRow {
   dayKey: DayKey;
   exerciseId: string;
-  /** Sum of amounts of that exercise on that day. */
   amount: number;
 }
 
-/** Raw XP per day, independent of the XP lock: Σ round(amount · xpPerUnit). */
+/** Raw XP per day, independent of the XP lock: Σ round(amount · xpPerUnit), rounded per set. */
 export function rawXpByDay(rows: readonly DailyVolumeRow[]): Record<DayKey, number> {
   const totals: Record<DayKey, number> = {};
   for (const row of rows) {

@@ -292,11 +292,13 @@ export async function getLastSets(db: SQLiteDatabase): Promise<Partial<Record<Ex
   return rowsToLastSets(rows);
 }
 
-/** Per-day, per-exercise volume since `fromDay` (inclusive) for the heatmap. */
+/**
+ * One row per logged set since `fromDay` (inclusive) for the heatmap. Not summed in SQL:
+ * raw XP is rounded per set (docs §14: Σ round(amount·xpPerUnit)).
+ */
 export async function getDailyVolume(db: SQLiteDatabase, fromDay: DayKey): Promise<DailyVolumeRow[]> {
   return db.getAllAsync<DailyVolumeRow>(
-    `SELECT day_key AS dayKey, exercise_id AS exerciseId, SUM(amount) AS amount
-     FROM exercise_logs WHERE day_key >= ? GROUP BY day_key, exercise_id`,
+    'SELECT day_key AS dayKey, exercise_id AS exerciseId, amount FROM exercise_logs WHERE day_key >= ?',
     fromDay,
   );
 }

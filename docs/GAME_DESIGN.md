@@ -270,7 +270,8 @@ Her egzersiz için **kişisel rekor** = tek bir sette ulaşılan en yüksek mikt
 
 - Onboarding testi şınav/mekik/squat/plank için başlangıç rekorlarını oluşturur (`source: 'baseline'`,
   değer > 0 ise).
-- Bir set işlenirken (§4 sırasında, setin XP'sinden sonra):
+- Bir set işlenirken (§4 sırasında; setin XP'si **ve** aynı setin tamamladığı görev ödülü level
+  XP'sine eklendikten sonra):
   - Egzersizin rekoru yoksa: set ilk rekor olur (`source: 'set'`). **Boss sayılmaz**, bonus yok.
   - `amount > rekor` ise: rekor güncellenir ve **BOSS YENİLDİ**. Bonus XP:
     ```
@@ -280,7 +281,8 @@ Her egzersiz için **kişisel rekor** = tek bir sette ulaşılan en yüksek mikt
     (`bonusDay`); aynı gün yeni rekorlar yine kaydedilir ve boss penceresi gösterilir, bonus 0'dır.
   - XP kilidi aktifse (ceza) rekor yine güncellenir ama bonus 0'dır ve `bonusDay` değişmez. Kilit,
     §4'teki gibi setin işlenmeye başladığı andaki duruma göre belirlenir.
-- Rank sınavı sonuçları da dört hareketin rekorlarını günceller (`source: 'exam'`), boss/bonus yok.
+- Rank sınavı sonuçları da dört hareketin rekorlarını günceller (`source: 'exam'`, yalnızca değer > 0
+  ve mevcut rekordan büyükse), boss/bonus yok; `bonusDay` korunur. Sınav geçilse de kalınsa da uygulanır.
 - Her egzersizin boss adı sabittir (ör. Şınav → "Demir Golem").
 
 ## 11. RPE (zorluk) ve uyarlanabilir hedefler
@@ -300,9 +302,10 @@ Her egzersiz için **kişisel rekor** = tek bir sette ulaşılan en yüksek mikt
 Her görev hedefi üretilirken kısa bir açıklama (`note`) yazılır. Ondalık ayırıcı virgüldür.
 
 - Günlük hedef: `Taban 10 · Lv 3 ×1,16 · Güç 14 ×1,16 · RPE 8,4 ×0,93 → 13`
-  (RPE verisi yoksa RPE kısmı yazılmaz; üst sınıra takıldıysa sonuna ` (üst sınır)` eklenir).
+  (çarpanlar 2, RPE ortalaması 1 ondalıkla yazılır — ör. `RPE 10,0`; RPE verisi yoksa RPE kısmı
+  yazılmaz). Hedef üst sınıra eşitse ve ham değer üst sınırdan büyükse sonuna ` (üst sınır)` eklenir.
 - Odak hedefinde başa `Odak: en zayıf statın <Stat> (<değer>). ` eklenir.
-- Ceza hedefi: `Ceza: taban 20 · Lv 3 ×1,16 → 25` (stat/RPE çarpanı yok).
+- Ceza hedefi: `Ceza: taban 20 · Lv 3 ×1,16 → 25` (stat/RPE çarpanı yok; aynı ` (üst sınır)` kuralı).
 
 ## 13. Dinlenme / hasta günü ve seri
 
@@ -314,7 +317,9 @@ Her görev hedefi üretilirken kısa bir açıklama (`note`) yazılır. Ondalık
   **seri bozulmaz**. Aktif bir ceza görevi varsa kaldırılmaz. O gün egzersiz yapılabilir, XP kurallar
   aynıdır. O günün hatırlatması kurulmaz.
 - **Seri** (`streak = { current, best, lastCompletedDay }`): günlük görev tamamlandığında
-  `current += 1`, `best = max(best, current)`. Dinlenme günleri seriyi ne artırır ne bozar.
+  `current += 1`, `best = max(best, current)` (gün başına en fazla bir kez). Bu, o gün dinlenme günü
+  işaretli olsa da veya ödül XP kilidi yüzünden yansa da geçerlidir — görevi bitirmek seriyi uzatır.
+  Görevi tamamlanmamış dinlenme günleri seriyi ne artırır ne bozar.
   Gün dönümünde önceki görev `failed` ise veya uygulama tam bir gün hiç açılmadıysa `current = 0`.
 
 ## 14. İstatistikler
@@ -323,7 +328,8 @@ Her görev hedefi üretilirken kısa bir açıklama (`note`) yazılır. Ondalık
   o günkü tüm setlerin ham XP'si (`Σ round(amount·xpPerUnit)`, XP kilidinden bağımsız). Seviye 0–4:
   değer 0 ise 0; aksi halde aralıktaki sıfırdan büyük değerlerin çeyrekliklerine göre
   (`≤ Q1` → 1, `≤ Q2` → 2, `≤ Q3` → 3, üstü → 4). Çeyreklik: sıralı dizide
-  `q(p) = v[floor(p·(n−1))]`. Dinlenme günleri ve günlük görevin tamamlandığı günler ayrıca işaretlenir.
+  `q(p) = v[floor(p·(n−1))]`. Dinlenme günleri ve günlük görevin tamamlandığı günler ayrıca işaretlenir;
+  bugünden sonraki (gelecek) hücrelerde değer 0, seviye 0 ve işaretler kapalıdır.
 - **Stat grafikleri:** her gün son kaydedilen stat değerleri (`stat_snapshots`) ile çizgi grafik +
   güncel statlar için beşgen (radar) grafik.
 - **Rekor listesi:** egzersiz sırasına göre güncel rekorlar, tarih ve kaynak.
