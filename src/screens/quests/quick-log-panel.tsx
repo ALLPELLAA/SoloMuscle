@@ -16,7 +16,7 @@ export interface QuickLogPanelProps {
   xpLocked: boolean;
   busy: boolean;
   /** Logs one set; resolves `true` when it was saved. */
-  onLog: (exerciseId: ExerciseId, amount: number) => Promise<boolean>;
+  onLog: (exerciseId: ExerciseId, amount: number, rpe: number | undefined) => Promise<boolean>;
 }
 
 /** "Kaydet" per incomplete objective, expanding into an inline amount entry. */
@@ -27,8 +27,8 @@ export function QuickLogPanel({ quest, tone, xpLocked, busy, onLog }: QuickLogPa
 
   if (open.length === 0) return null;
 
-  const submit = async (exerciseId: ExerciseId, amount: number) => {
-    const saved = await onLog(exerciseId, amount);
+  const submit = async (exerciseId: ExerciseId, amount: number, rpe: number | undefined) => {
+    const saved = await onLog(exerciseId, amount, rpe);
     if (saved) setExpanded(null);
   };
 
@@ -80,7 +80,7 @@ export function QuickLogPanel({ quest, tone, xpLocked, busy, onLog }: QuickLogPa
                 xpLocked={xpLocked}
                 busy={busy}
                 onCancel={() => setExpanded(null)}
-                onSubmit={(amount) => void submit(objective.exerciseId, amount)}
+                onSubmit={(amount, rpe) => void submit(objective.exerciseId, amount, rpe)}
               />
             ) : null}
           </View>

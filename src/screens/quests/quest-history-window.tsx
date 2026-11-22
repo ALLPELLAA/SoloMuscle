@@ -10,11 +10,11 @@ import { formatHistoryDay } from './format';
 
 type TextTone = 'neon' | 'danger' | 'success' | 'gold' | 'secondary' | 'muted';
 
-const STATUS_VIEW: Record<QuestStatus, { label: string; tone: TextTone; color: string }> = {
-  active: { label: 'DEVAM EDİYOR', tone: 'neon', color: colors.neon },
-  completed: { label: 'TAMAMLANDI', tone: 'success', color: colors.success },
-  failed: { label: 'BAŞARISIZ', tone: 'danger', color: colors.danger },
-  excused: { label: 'DİNLENME GÜNÜ', tone: 'secondary', color: colors.textSecondary },
+const STATUS_VIEW: Record<QuestStatus, { label: string; color: string }> = {
+  active: { label: 'DEVAM EDİYOR', color: colors.neon },
+  completed: { label: 'TAMAMLANDI', color: colors.success },
+  failed: { label: 'BAŞARISIZ', color: colors.danger },
+  excused: { label: 'DİNLENME', color: colors.purple },
 };
 
 function rewardView(quest: Quest): { text: string; tone: TextTone } {
@@ -25,6 +25,7 @@ function rewardView(quest: Quest): { text: string; tone: TextTone } {
     return quest.awardedXp > 0 ? { text: `+${quest.awardedXp} XP`, tone: 'gold' } : { text: 'ÖDÜL YANDI', tone: 'danger' };
   }
   if (quest.status === 'active') return { text: `ÖDÜL ${quest.rewardXp} XP`, tone: 'muted' };
+  if (quest.status === 'excused') return { text: 'CEZASIZ · +0 XP', tone: 'secondary' };
   return { text: '+0 XP', tone: 'muted' };
 }
 
@@ -78,7 +79,7 @@ function HistoryRow({ quest, today, first }: { quest: Quest; today: DayKey; firs
           <SystemText variant="bodyStrong" style={styles.flex} numberOfLines={1}>
             {formatHistoryDay(quest.dayKey, today)}
           </SystemText>
-          <SystemText variant="label" tone={status.tone}>
+          <SystemText variant="label" style={{ color: status.color }}>
             {status.label}
           </SystemText>
         </View>

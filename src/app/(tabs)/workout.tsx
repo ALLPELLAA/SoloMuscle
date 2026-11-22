@@ -1,11 +1,5 @@
-import { Screen } from '@/components/screen';
-import { SystemText } from '@/components/system-text';
+import { WorkoutScreen } from '@/screens/workout/workout-screen';
 
-// PLACEHOLDER — replaced by the screen implementation.
-export default function PlaceholderScreen() {
-  return (
-    <Screen>
-      <SystemText>TODO</SystemText>
-    </Screen>
-  );
+export default function WorkoutTab() {
+  return <WorkoutScreen />;
 }

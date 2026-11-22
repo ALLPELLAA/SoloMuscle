@@ -16,6 +16,8 @@ import {
 } from '@/game';
 import { colors, spacing, toneColors, type Tone } from '@/theme';
 
+import { RpePicker } from './rpe-picker';
+
 export interface QuickLogEditorProps {
   exerciseId: ExerciseId;
   /** Amount still missing for the objective (prefills the stepper). */
@@ -24,7 +26,8 @@ export interface QuickLogEditorProps {
   xpLocked: boolean;
   busy: boolean;
   onCancel: () => void;
-  onSubmit: (amount: number) => void;
+  /** `rpe` is `undefined` when the player skipped the optional effort rating. */
+  onSubmit: (amount: number, rpe: number | undefined) => void;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -36,6 +39,7 @@ export function QuickLogEditor({ exerciseId, remaining, tone, xpLocked, busy, on
   const def = getExercise(exerciseId);
   const limits = AMOUNT_LIMITS[def.unit];
   const [amount, setAmount] = useState(() => clamp(remaining, limits.min, limits.max));
+  const [rpe, setRpe] = useState<number | null>(null);
   const error = validateExerciseAmount(exerciseId, amount);
   const t = toneColors[tone];
 
@@ -62,6 +66,7 @@ export function QuickLogEditor({ exerciseId, remaining, tone, xpLocked, busy, on
           </SystemText>
         </View>
       )}
+      <RpePicker value={rpe} onChange={setRpe} tone={tone} disabled={busy} />
       <View style={styles.actions}>
         <SystemButton label="İptal" variant="ghost" tone={tone} size="sm" onPress={onCancel} disabled={busy} />
         <SystemButton
@@ -73,7 +78,7 @@ export function QuickLogEditor({ exerciseId, remaining, tone, xpLocked, busy, on
           loading={busy}
           disabled={error !== null}
           icon={<Ionicons name="checkmark" size={16} color={colors.background} />}
-          onPress={() => onSubmit(amount)}
+          onPress={() => onSubmit(amount, rpe ?? undefined)}
         />
       </View>
     </Animated.View>
@@ -81,7 +86,7 @@ export function QuickLogEditor({ exerciseId, remaining, tone, xpLocked, busy, on
 }
 
 const styles = StyleSheet.create({
-  root: { gap: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1 },
+  root: { gap: spacing.md, paddingTop: spacing.md, borderTopWidth: 1 },
   previewRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: spacing.sm },
   confirm: { flex: 1 },

@@ -2,7 +2,17 @@
 import type Ionicons from '@expo/vector-icons/Ionicons';
 import type { ComponentProps } from 'react';
 
-import { formatAmount, getExercise, STAT_KEYS, STAT_LABELS, type ExerciseEntry, type LogResult } from '@/game';
+import {
+  formatAmount,
+  getExercise,
+  REST_KIND_LABELS,
+  RPE_LABELS,
+  STAT_KEYS,
+  STAT_LABELS,
+  type ExerciseEntry,
+  type LogResult,
+  type RestDayKind,
+} from '@/game';
 import type { Tone } from '@/theme';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -25,6 +35,7 @@ export function buildLogToast(result: LogResult, entry: ExerciseEntry): LogToast
   const def = getExercise(entry.exerciseId);
   const lines = [`${def.name} · ${formatAmount(entry.exerciseId, entry.amount)} kaydedildi.`];
   const highlights: ToastHighlight[] = [];
+  if (entry.rpe !== undefined) lines.push(`Efor: RPE ${entry.rpe} · ${RPE_LABELS[entry.rpe]}`);
 
   if (result.xpLocked) {
     lines.push('Ceza Görevi aktif: bu kayıt XP vermedi.');
@@ -53,6 +64,10 @@ export function buildLogToast(result: LogResult, entry: ExerciseEntry): LogToast
     }
   }
 
+  if (result.streakExtended) {
+    highlights.push({ text: `SERİ: ${result.state.player.streak.current} GÜN`, tone: 'gold' });
+  }
+
   return {
     tone,
     icon,
@@ -64,4 +79,24 @@ export function buildLogToast(result: LogResult, entry: ExerciseEntry): LogToast
 
 export function buildErrorToast(message: string): LogToastContent {
   return { tone: 'danger', icon: 'alert-circle', headline: 'KAYIT BAŞARISIZ', lines: [message], highlights: [] };
+}
+
+/** Confirmation after marking / unmarking today as a rest or sick day. */
+export function buildRestToast(kind: RestDayKind | null): LogToastContent {
+  if (kind === null) {
+    return {
+      tone: 'neon',
+      icon: 'refresh',
+      headline: 'İŞARET KALDIRILDI',
+      lines: ['Bugün normal gün. Görev tamamlanmazsa gün dönümünde Ceza Görevi açılır.'],
+      highlights: [],
+    };
+  }
+  return {
+    tone: 'neon',
+    icon: kind === 'sick' ? 'medkit' : 'bed',
+    headline: REST_KIND_LABELS[kind].toLocaleUpperCase('tr-TR'),
+    lines: ['Sistem bugünü işaretledi. Görev tamamlanmazsa ceza açılmaz, serin korunur.'],
+    highlights: [],
+  };
 }

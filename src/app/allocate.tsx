@@ -1,11 +1,5 @@
-import { Screen } from '@/components/screen';
-import { SystemText } from '@/components/system-text';
+import { AllocateScreen } from '@/screens/allocate/allocate-screen';
 
-// PLACEHOLDER — replaced by the screen implementation.
-export default function PlaceholderScreen() {
-  return (
-    <Screen>
-      <SystemText>TODO</SystemText>
-    </Screen>
-  );
+export default function AllocateRoute() {
+  return <AllocateScreen />;
 }

@@ -9,17 +9,25 @@ import { Screen } from '@/components/screen';
 import { SystemButton } from '@/components/system-button';
 import { SystemText } from '@/components/system-text';
 import { SystemWindow } from '@/components/system-window';
-import { REST_KIND_LABELS, validateExerciseAmount, type ExerciseId, type Quest } from '@/game';
+import {
+  isValidRpe,
+  validateExerciseAmount,
+  type ExerciseEntry,
+  type ExerciseId,
+  type Quest,
+  type RestDayKind,
+} from '@/game';
 import { useGame } from '@/state/game-provider';
-import { colors, radii, spacing, toneColors } from '@/theme';
+import { colors, spacing } from '@/theme';
 
-import { buildErrorToast, buildLogToast, type LogToastContent } from './log-toast-content';
+import { buildErrorToast, buildLogToast, buildRestToast, type LogToastContent } from './log-toast-content';
 import { LogToast } from './log-toast';
 import { PenaltyLockNotice } from './penalty-lock-notice';
 import { QuestCompleteWindow } from './quest-complete-window';
 import { QuestHistoryWindow } from './quest-history-window';
 import { QuestsHeader } from './quests-header';
 import { QuickLogPanel } from './quick-log-panel';
+import { RestDayWindow } from './rest-day-window';
 import { useQuestHistory } from './use-quest-history';
 
 const HISTORY_LIMIT = 14;
@@ -35,7 +43,8 @@ function errorText(error: unknown): string {
 
 /** "Görevler" tab: penalty quest, daily quest with quick logging, and quest history. */
 export function QuestsScreen() {
-  const { state, today, xpLocked, restDayToday, logWorkout, refresh } = useGame();
+  const { state, today, xpLocked, restDayToday, restDayEligibility, logWorkout, markRestDay, unmarkRestDay, refresh } =
+    useGame();
   const history = useQuestHistory(HISTORY_LIMIT);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ id: number; content: LogToastContent } | null>(null);
@@ -52,15 +61,15 @@ export function QuestsScreen() {
   const dismissToast = useCallback(() => setToast(null), []);
 
   const handleLog = useCallback(
-    async (exerciseId: ExerciseId, amount: number): Promise<boolean> => {
+    async (exerciseId: ExerciseId, amount: number, rpe: number | undefined): Promise<boolean> => {
       const invalid = validateExerciseAmount(exerciseId, amount);
-      if (invalid) {
-        showToast(buildErrorToast(invalid));
+      if (invalid || (rpe !== undefined && !isValidRpe(rpe))) {
+        showToast(buildErrorToast(invalid ?? 'RPE 1–10 arasında olmalı.'));
         return false;
       }
       setBusy(true);
       try {
-        const entry = { exerciseId, amount };
+        const entry: ExerciseEntry = rpe === undefined ? { exerciseId, amount } : { exerciseId, amount, rpe };
         const result = await logWorkout([entry]);
         showToast(buildLogToast(result, entry));
         const feedback =
@@ -81,6 +90,28 @@ export function QuestsScreen() {
     },
     [logWorkout, showToast],
   );
+
+  const runRestAction = useCallback(
+    async (kind: RestDayKind | null): Promise<boolean> => {
+      setBusy(true);
+      try {
+        if (kind) await markRestDay(kind);
+        else await unmarkRestDay();
+        showToast(buildRestToast(kind));
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+        return true;
+      } catch (error) {
+        showToast(buildErrorToast(errorText(error)));
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [markRestDay, showToast, unmarkRestDay],
+  );
+  const handleMarkRest = useCallback((kind: RestDayKind) => runRestAction(kind), [runRestAction]);
+  const handleUnmarkRest = useCallback(() => runRestAction(null), [runRestAction]);
 
   if (!state) {
     return (
@@ -131,14 +162,6 @@ export function QuestsScreen() {
             ) : (
               <>
                 <QuestCard quest={dailyQuest} xpLocked={xpLocked} />
-                {restDayToday && dailyQuest.status === 'active' ? (
-                  <View style={styles.restNote}>
-                    <Ionicons name="bed-outline" size={18} color={colors.gold} />
-                    <SystemText variant="caption" tone="secondary" style={styles.flex}>
-                      {`${REST_KIND_LABELS[restDayToday.kind]}: görev tamamlanmazsa ceza açılmaz ve seri bozulmaz.`}
-                    </SystemText>
-                  </View>
-                ) : null}
                 {dailyQuest.status === 'active' ? (
                   <QuickLogPanel quest={dailyQuest} tone="neon" xpLocked={xpLocked} busy={busy} onLog={handleLog} />
                 ) : null}
@@ -162,6 +185,15 @@ export function QuestsScreen() {
           />
         ) : null}
 
+        <RestDayWindow
+          restDay={restDayToday}
+          eligibility={restDayEligibility}
+          penaltyActive={penaltyActive}
+          busy={busy}
+          onMark={handleMarkRest}
+          onUnmark={handleUnmarkRest}
+        />
+
         <QuestHistoryWindow quests={history.quests} today={today} loaded={history.loaded} />
       </Screen>
 
@@ -174,16 +206,4 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   loading: { flexGrow: 1, justifyContent: 'center' },
   section: { gap: spacing.md },
-  restNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: toneColors.gold.dim,
-    backgroundColor: toneColors.gold.faint,
-    borderRadius: radii.sm,
-  },
-  flex: { flex: 1 },
 });
