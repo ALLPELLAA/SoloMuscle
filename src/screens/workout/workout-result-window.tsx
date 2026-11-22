@@ -45,13 +45,13 @@ export function WorkoutResultWindow({ result, setCount, onClose }: WorkoutResult
       <Animated.View entering={FadeInDown.delay(80)} style={styles.split}>
         <SplitCell label="Egzersiz" value={result.exerciseXp} />
         <SplitCell label="Görev ödülü" value={result.questRewardXp} />
-        <SplitCell label="Rekor bonusu" value={result.recordBonusXp} />
+        <SplitCell label="Boss bonusu" value={result.recordBonusXp} />
       </Animated.View>
 
       {result.xpLocked ? (
         <Animated.View entering={FadeInDown.delay(160)}>
           <Notice icon="lock-closed" tone="danger">
-            XP kilitliydi: ceza görevi aktifken yapılan setler XP ve rekor bonusu vermedi.
+            XP kilitliydi: ceza görevi aktifken yapılan setler XP ve Boss bonusu vermedi.
           </Notice>
         </Animated.View>
       ) : null}

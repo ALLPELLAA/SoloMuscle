@@ -1,3 +1,4 @@
+import { useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
@@ -96,11 +97,18 @@ function RadarChart({ width, stats, scale }: { width: number; stats: Stats; scal
   const outer = STAT_KEYS.map((_, i) => vertex(center, radius, i, 1));
   const values = STAT_KEYS.map((key, i) => vertex(local, radius, i, Math.min(1, Math.max(0.04, stats[key] / scale))));
 
+  // Endless glow pulse; paused while the tab is hidden (battery).
+  const focused = useIsFocused();
   const pulse = useSharedValue(0);
   useEffect(() => {
+    if (!focused) {
+      cancelAnimation(pulse);
+      pulse.set(0);
+      return;
+    }
     pulse.set(withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.quad) }), -1, true));
     return () => cancelAnimation(pulse);
-  }, [pulse]);
+  }, [focused, pulse]);
   const glowStyle = useAnimatedStyle(() => ({ opacity: 0.35 + 0.65 * pulse.get() }));
 
   return (

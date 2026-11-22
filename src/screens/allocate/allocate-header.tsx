@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { SystemText } from '@/components/system-text';
 import { colors, glow, radii, spacing } from '@/theme';
@@ -10,6 +10,8 @@ export interface AllocateHeaderProps {
 
 /** Back button + `STAT PUANI DAĞITIMI` title. */
 export function AllocateHeader({ onBack }: AllocateHeaderProps) {
+  // adjustsFontSizeToFit is native-only: use a smaller title on narrow phones too.
+  const compact = useWindowDimensions().width < 400;
   return (
     <View style={styles.root}>
       <Pressable
@@ -22,7 +24,14 @@ export function AllocateHeader({ onBack }: AllocateHeaderProps) {
         <Ionicons name="chevron-back" size={22} color={colors.neon} />
       </Pressable>
       <View style={styles.titles}>
-        <SystemText variant="title" tone="neon" glow numberOfLines={1} adjustsFontSizeToFit>
+        <SystemText
+          variant="title"
+          tone="neon"
+          glow
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          style={compact && styles.titleCompact}
+        >
           STAT PUANI DAĞITIMI
         </SystemText>
         <SystemText variant="caption" tone="secondary">
@@ -48,4 +57,5 @@ const styles = StyleSheet.create({
   },
   backPressed: { backgroundColor: colors.neonDim, boxShadow: glow.neonSoft },
   titles: { flex: 1, gap: spacing.xxs },
+  titleCompact: { fontSize: 18, letterSpacing: 1 },
 });

@@ -1,5 +1,7 @@
+import { useIsFocused } from 'expo-router';
+import { useEffect, useState } from 'react';
+
 import { msUntilNextMidnight } from '@/game';
-import { useNow } from '@/hooks/use-now';
 
 import { formatCountdown } from './format';
 
@@ -13,9 +15,22 @@ export interface ResetCountdown {
   dayProgress: number;
 }
 
-/** Live countdown to the next local 00:00, when the daily quest is renewed. */
+/** Live countdown to the next local 00:00, when the daily quest is renewed. Ticks only while the tab is visible. */
 export function useResetCountdown(): ResetCountdown {
-  const now = useNow(1000);
+  const focused = useIsFocused();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!focused) return;
+    const tick = () => setNow(Date.now());
+    // Catch up right away when the tab regains focus instead of showing the stale value for a second.
+    const catchUp = setTimeout(tick, 0);
+    const id = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(catchUp);
+      clearInterval(id);
+    };
+  }, [focused]);
+
   const remainingMs = msUntilNextMidnight(now);
   return {
     remainingMs,

@@ -111,7 +111,7 @@ export function ActivityHeatmap({ heatmap, weeks, today, restKinds }: ActivityHe
         <View style={styles.totals}>
           <Total label="AKTİF GÜN" value={String(heatmap.activeDays)} />
           <View style={styles.totalDivider} />
-          <Total label="TOPLAM XP" value={formatNumber(heatmap.totalValue)} gold />
+          <Total label="ANTRENMAN XP" value={formatNumber(heatmap.totalValue)} gold />
         </View>
       ) : null}
     </SystemWindow>
@@ -308,7 +308,7 @@ function Legend() {
 function Total({ label, value, gold = false }: { label: string; value: string; gold?: boolean }) {
   return (
     <View style={styles.total}>
-      <SystemText variant="label" tone="muted">
+      <SystemText variant="label" tone="muted" numberOfLines={1} style={styles.totalLabel}>
         {label}
       </SystemText>
       <SystemText variant="mono" tone={gold ? 'gold' : 'neon'}>
@@ -366,6 +366,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     gap: spacing.md,
   },
-  total: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  // Label above the value: a long label + a 5-digit XP total would not fit side by side at 360 dp.
+  total: { flex: 1, gap: spacing.xxs },
+  totalLabel: { fontSize: 11, letterSpacing: 1.5 },
   totalDivider: { width: 1, alignSelf: 'stretch', backgroundColor: colors.neonFaint },
 });

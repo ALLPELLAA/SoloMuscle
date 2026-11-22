@@ -79,7 +79,14 @@ export function NameStep({ name, onChangeName, onSubmit }: NameStepProps) {
             <SystemText variant="caption" tone="muted">
               OYUNCU
             </SystemText>
-            <SystemText variant="title" tone={usingDefault ? 'default' : 'gold'} glow={!usingDefault} numberOfLines={1}>
+            <SystemText
+              variant="title"
+              tone={usingDefault ? 'default' : 'gold'}
+              glow={!usingDefault}
+              numberOfLines={2}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
+            >
               {registered}
             </SystemText>
           </View>

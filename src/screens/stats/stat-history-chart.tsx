@@ -62,7 +62,8 @@ export function StatHistoryChart({ snapshots }: StatHistoryChartProps) {
     >
       {enough ? (
         <>
-          <View onLayout={onLayout} style={styles.measure}>
+          {/* Own key: never reuse the empty-state View, or onLayout may never fire (web). */}
+          <View key="chart" onLayout={onLayout} style={styles.measure}>
             {width > 0 ? (
               <LineChart
                 width={width}
@@ -93,7 +94,7 @@ export function StatHistoryChart({ snapshots }: StatHistoryChartProps) {
           </SystemText>
         </>
       ) : (
-        <View style={styles.empty}>
+        <View key="empty" style={styles.empty}>
           <Ionicons name="analytics-outline" size={32} color={colors.neonDim} />
           <SystemText variant="bodyStrong" tone="secondary" align="center">
             Grafik için en az 2 günlük veri gerekir

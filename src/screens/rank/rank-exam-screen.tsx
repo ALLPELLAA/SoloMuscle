@@ -64,7 +64,9 @@ export function RankExamScreen() {
 
   if (outcome) {
     return (
+      // Own key: remount the ScrollView so the result starts at the top, not at the form's offset.
       <Screen
+        key="result"
         edges={['top', 'bottom']}
         footer={
           <SystemButton

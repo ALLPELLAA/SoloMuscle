@@ -2,7 +2,8 @@ import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { DEFAULT_REST_SECONDS, adjustRestTimer, restRemainingMs, startRestTimer, type RestTimer } from '@/game';
-import { useNow } from '@/hooks/use-now';
+
+const TICK_MS = 250;
 
 interface RunningRest {
   timer: RestTimer;
@@ -28,12 +29,26 @@ export interface RestTimerControls {
 export function useRestTimer(): RestTimerControls {
   const [presetSeconds, setPresetSeconds] = useState(DEFAULT_REST_SECONDS);
   const [rest, setRest] = useState<RunningRest | null>(null);
-  const now = useNow(250, rest !== null);
+  const [now, setNow] = useState(() => Date.now());
 
   // `now` may lag a tick behind a freshly started timer; never count from before its start.
   const remainingMs = rest ? restRemainingMs(rest.timer, Math.max(now, rest.timer.startedAt)) : 0;
   const finished = rest !== null && remainingMs === 0;
   const progress = rest && rest.totalMs > 0 ? remainingMs / rest.totalMs : 0;
+
+  // Tick only while a rest is counting down: once it reaches 0 the frozen `now` keeps it finished,
+  // and a new start/adjust sets `running` again.
+  const running = rest !== null && !finished;
+  useEffect(() => {
+    if (!running) return;
+    const tick = () => setNow(Date.now());
+    const catchUp = setTimeout(tick, 0);
+    const id = setInterval(tick, TICK_MS);
+    return () => {
+      clearTimeout(catchUp);
+      clearInterval(id);
+    };
+  }, [running]);
 
   const firedFor = useRef<RestTimer | null>(null);
   useEffect(() => {

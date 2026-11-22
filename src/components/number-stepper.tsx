@@ -135,7 +135,9 @@ const styles = StyleSheet.create({
     ...typography.monoLarge,
     color: colors.text,
     textAlign: 'center',
-    minWidth: 80,
+    // Fill the value box (on web an <input> would otherwise keep its intrinsic ~350 px width).
+    alignSelf: 'stretch',
+    minWidth: 0,
     paddingVertical: 0,
   },
   stepButton: {

@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, View } from 'react-native';
+import { useIsFocused } from 'expo-router';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
 import { SystemText } from '@/components/system-text';
@@ -19,7 +20,8 @@ export interface WorkoutHeaderProps {
 /** "ANTRENMAN" title strip with the live session clock. */
 export function WorkoutHeader({ startedAt, setCount, xpLocked }: WorkoutHeaderProps) {
   const active = startedAt !== null;
-  const now = useNow(1000, active);
+  const focused = useIsFocused();
+  const now = useNow(1000, active && focused);
   const pulse = useNeonPulse(active, 1100);
   const dotStyle = useAnimatedStyle(() => ({ opacity: 0.35 + 0.65 * pulse.get() }));
   const elapsed = active ? Math.max(0, now - startedAt) : 0;

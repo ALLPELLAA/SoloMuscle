@@ -198,6 +198,8 @@ const styles = StyleSheet.create({
   presets: { flex: 1, flexDirection: 'row', gap: spacing.xs },
   preset: {
     flex: 1,
+    minHeight: 44,
+    justifyContent: 'center',
     paddingVertical: spacing.xs + 2,
     borderRadius: radii.sm,
     borderWidth: 1,

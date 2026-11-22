@@ -103,7 +103,7 @@ export function SessionWindow({
             <View style={styles.breakdown}>
               <Breakdown label="Set XP" value={exerciseXp} />
               {questXp > 0 ? <Breakdown label="Görev ödülü" value={questXp} /> : null}
-              {bonusXp > 0 ? <Breakdown label="Rekor bonusu" value={bonusXp} /> : null}
+              {bonusXp > 0 ? <Breakdown label="Boss bonusu" value={bonusXp} /> : null}
             </View>
             {xpLocked ? (
               <View style={styles.lockRow}>
@@ -159,18 +159,19 @@ export function SessionWindow({
           </SystemWindow>
         </Animated.View>
       ) : (
-        <View style={styles.actions}>
+        <View style={styles.footer}>
           <SystemButton
             label="İptal"
             variant="outline"
             tone="danger"
+            style={styles.cancelButton}
             disabled={empty || busy}
             onPress={() => setConfirmingCancel(true)}
           />
           <SystemButton
             label="Antrenmanı Bitir"
             variant="solid"
-            style={styles.flex}
+            style={styles.finishButton}
             disabled={empty}
             loading={busy}
             icon={<Ionicons name="checkmark-done" size={20} color={colors.background} />}
@@ -314,4 +315,8 @@ const styles = StyleSheet.create({
   breakdownItem: { gap: spacing.xxs },
   lockRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   actions: { flexDirection: 'row', gap: spacing.sm },
+  // Side by side when there is room; on narrow phones "Bitir" wraps above a full-width "İptal".
+  footer: { flexDirection: 'row', flexWrap: 'wrap-reverse', gap: spacing.sm },
+  cancelButton: { flexGrow: 1 },
+  finishButton: { flexGrow: 3, flexBasis: 220 },
 });

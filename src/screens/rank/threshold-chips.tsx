@@ -13,7 +13,7 @@ export interface ThresholdChipsProps {
   dimmed?: boolean;
 }
 
-/** Four compact cells: Şınav / Mekik / Squat / Plank with their values. */
+/** Four compact cells: Şınav / Mekik / Squat / Plank with their values (unit as a caption below). */
 export function ThresholdChips({ values, passed, dimmed = false }: ThresholdChipsProps) {
   return (
     <View style={[styles.row, dimmed && styles.dimmed]}>
@@ -34,8 +34,13 @@ export function ThresholdChips({ values, passed, dimmed = false }: ThresholdChip
               variant="mono"
               tone={state === true ? 'success' : state === false ? 'danger' : 'default'}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
             >
-              {`${state === true ? '✓ ' : state === false ? '✗ ' : ''}${formatMetric(key, values[key])}`}
+              {`${state === true ? '✓ ' : state === false ? '✗ ' : ''}${values[key]}`}
+            </SystemText>
+            <SystemText variant="caption" tone="muted" style={styles.unit} numberOfLines={1}>
+              {key === 'plankSeconds' ? 'sn' : 'tekrar'}
             </SystemText>
           </View>
         );
@@ -59,4 +64,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.backgroundAlt,
   },
   label: { fontSize: 10, letterSpacing: 1 },
+  unit: { fontSize: 10, lineHeight: 12 },
 });

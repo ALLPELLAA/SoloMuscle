@@ -35,7 +35,7 @@ export function PlayerWindow({ player, xpLocked }: PlayerWindowProps) {
           <SystemText variant="label" tone="secondary">
             İSİM
           </SystemText>
-          <SystemText variant="title" numberOfLines={1}>
+          <SystemText variant="title" numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.6}>
             {player.name}
           </SystemText>
           <View style={styles.levelRow}>

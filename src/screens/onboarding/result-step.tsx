@@ -65,7 +65,7 @@ export function ResultStep({ preview, reminder, error }: ResultStepProps) {
               <SystemText variant="caption" tone="muted">
                 OYUNCU
               </SystemText>
-              <SystemText variant="title" numberOfLines={1}>
+              <SystemText variant="title" numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.6}>
                 {player.name}
               </SystemText>
               <View style={styles.tags}>

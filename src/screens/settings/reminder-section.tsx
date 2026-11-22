@@ -8,7 +8,7 @@ import { NumberStepper } from '@/components/number-stepper';
 import { SystemButton } from '@/components/system-button';
 import { SystemText } from '@/components/system-text';
 import { SystemWindow } from '@/components/system-window';
-import { formatTime } from '@/game';
+import { formatTime, type ReminderSettings } from '@/game';
 import { useGame } from '@/state/game-provider';
 import { colors, radii, spacing } from '@/theme';
 
@@ -21,6 +21,10 @@ const DENIED_TEXT =
     ? 'Web önizlemede bildirimler desteklenmez. Hatırlatmayı denemek için uygulamayı Android cihazda aç.'
     : 'Bildirim izni reddedildi. Ayar kaydedildi ama hatırlatma gelmeyecek. Android Ayarlar → Uygulamalar → SoloMuscle → Bildirimler bölümünden izin ver.';
 
+function sameReminder(a: ReminderSettings, b: ReminderSettings): boolean {
+  return a.enabled === b.enabled && a.hour === b.hour && a.minute === b.minute;
+}
+
 /** Daily quest reminder: on/off, time (hour + minute in 5-minute steps) and save. */
 export function ReminderSection() {
   const { reminder, updateReminder } = useGame();
@@ -29,6 +33,17 @@ export function ReminderSection() {
   const [minute, setMinute] = useState(reminder.minute);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
+  // The saved setting the form was last synced to. When the stored reminder changes (e.g. it
+  // finished loading after this screen mounted) and the user has no unsaved edits, adopt it.
+  const [base, setBase] = useState<ReminderSettings>(reminder);
+  if (!sameReminder(base, reminder)) {
+    setBase(reminder);
+    if (sameReminder(base, { enabled, hour, minute })) {
+      setEnabled(reminder.enabled);
+      setHour(reminder.hour);
+      setMinute(reminder.minute);
+    }
+  }
 
   const dirty = enabled !== reminder.enabled || hour !== reminder.hour || minute !== reminder.minute;
   const scheduleText = reminder.enabled ? `Her gün ${formatTime(reminder.hour, reminder.minute)}` : 'Kapalı';

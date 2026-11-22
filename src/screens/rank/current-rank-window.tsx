@@ -51,8 +51,14 @@ export function CurrentRankWindow({ player }: CurrentRankWindowProps) {
           <SystemText variant="label" tone="muted">
             AVCI SINIFI
           </SystemText>
-          <SystemText variant="display" style={[styles.rankName, { color, textShadowColor: color }]}>
-            {`${player.rank}-RANK`}
+          <SystemText
+            variant="display"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+            style={[styles.rankName, { color, textShadowColor: color }]}
+          >
+            {`${player.rank} RANK`}
           </SystemText>
           <SystemText variant="heading">{RANK_TITLES[player.rank].toLocaleUpperCase('tr-TR')}</SystemText>
         </View>
@@ -91,7 +97,7 @@ export function CurrentRankWindow({ player }: CurrentRankWindowProps) {
 }
 
 const styles = StyleSheet.create({
-  hero: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl, paddingVertical: spacing.sm },
+  hero: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, paddingVertical: spacing.sm },
   badgeWrap: { width: 112, height: 112, alignItems: 'center', justifyContent: 'center' },
   halo: {
     position: 'absolute',

@@ -35,12 +35,12 @@ export function buildLogToast(result: LogResult, entry: ExerciseEntry): LogToast
   const def = getExercise(entry.exerciseId);
   const lines = [`${def.name} · ${formatAmount(entry.exerciseId, entry.amount)} kaydedildi.`];
   const highlights: ToastHighlight[] = [];
-  if (entry.rpe !== undefined) lines.push(`Efor: RPE ${entry.rpe} · ${RPE_LABELS[entry.rpe]}`);
+  if (entry.rpe !== undefined) lines.push(`Zorluk: RPE ${entry.rpe} · ${RPE_LABELS[entry.rpe]}`);
 
   if (result.xpLocked) {
     lines.push('Ceza Görevi aktif: bu kayıt XP vermedi.');
   } else {
-    if (result.recordBonusXp > 0) lines.push(`Rekor bonusu: +${result.recordBonusXp} XP`);
+    if (result.recordBonusXp > 0) lines.push(`Boss bonusu: +${result.recordBonusXp} XP`);
     const increases = STAT_KEYS.filter((key) => (result.statIncreases[key] ?? 0) > 0).map(
       (key) => `${STAT_LABELS[key]} +${result.statIncreases[key] ?? 0}`,
     );

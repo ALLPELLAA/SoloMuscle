@@ -15,7 +15,7 @@ export interface RpePickerProps {
 
 const VALUES = Array.from({ length: RPE_MAX - RPE_MIN + 1 }, (_, i) => RPE_MIN + i);
 
-/** Optional perceived-exertion chips 1–10; tapping the selected chip clears it. */
+/** Optional "Zorluk (RPE)" chips 1–10; tapping the selected chip clears it. */
 export function RpePicker({ value, onChange, tone, disabled = false }: RpePickerProps) {
   const t = toneColors[tone];
 
@@ -28,13 +28,13 @@ export function RpePicker({ value, onChange, tone, disabled = false }: RpePicker
     <View style={styles.root}>
       <View style={styles.header}>
         <SystemText variant="label" tone="secondary" style={styles.flex}>
-          EFOR (RPE)
+          ZORLUK (RPE)
         </SystemText>
         <SystemText variant="label" tone={value === null ? 'muted' : tone}>
           {value === null ? 'İSTEĞE BAĞLI' : `${value} · ${RPE_LABELS[value].toLocaleUpperCase('tr-TR')}`}
         </SystemText>
       </View>
-      <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Efor seviyesi (RPE), isteğe bağlı">
+      <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Zorluk seviyesi (RPE), isteğe bağlı">
         {VALUES.map((rpe) => {
           const selected = value === rpe;
           const filled = value !== null && rpe < value;
@@ -71,10 +71,12 @@ const styles = StyleSheet.create({
   root: { gap: spacing.xs },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   flex: { flex: 1 },
-  chips: { flexDirection: 'row', gap: spacing.xs },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   chip: {
-    flex: 1,
-    height: 32,
+    flexGrow: 1,
+    flexBasis: '18%',
+    minWidth: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,

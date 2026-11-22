@@ -119,14 +119,14 @@ export function RestDayWindow({ restDay, eligibility, penaltyActive, busy, onMar
           <SystemText variant="caption" tone="secondary">
             Yorgun ya da hasta mısın? Bugünü işaretle: görev tamamlanmazsa ceza açılmaz ve serin bozulmaz.
           </SystemText>
-          <View style={styles.row}>
+          <View style={styles.kindRow}>
             {(['rest', 'sick'] as const).map((kind) => (
               <SystemButton
                 key={kind}
                 label={kind === 'rest' ? 'Dinlenme Günü' : 'Hasta Günü'}
                 size="sm"
                 disabled={busy || blocked}
-                style={styles.flex}
+                style={styles.kindButton}
                 icon={<Ionicons name={KIND_ICONS[kind]} size={16} color={colors.neon} />}
                 accessibilityHint="Onay ister"
                 onPress={() => setPending(kind)}
@@ -189,6 +189,9 @@ const styles = StyleSheet.create({
   stack: { gap: spacing.md },
   row: { flexDirection: 'row', gap: spacing.sm },
   flex: { flex: 1 },
+  // Two equal buttons side by side; stacked on narrow phones so the labels never truncate.
+  kindRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  kindButton: { flexGrow: 1, flexBasis: 160 },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

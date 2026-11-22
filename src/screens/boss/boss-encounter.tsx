@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect } from 'react';
-import { BackHandler, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { BackHandler, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -33,6 +33,8 @@ export function BossEncounter({ event, closing, onContinue }: BossEncounterProps
   const { clock, phase, done, reduceMotion, skip } = useBossTimeline();
   const defeated = phase === 'defeated';
   const tone = defeated ? 'gold' : 'danger';
+  // adjustsFontSizeToFit is native-only: pick a smaller display size on narrow phones too.
+  const compactTitle = useWindowDimensions().width < 400;
 
   // Hardware back: first finishes the animation, then behaves like "DEVAM".
   useEffect(() => {
@@ -141,7 +143,7 @@ export function BossEncounter({ event, closing, onContinue }: BossEncounterProps
                     align="center"
                     numberOfLines={1}
                     adjustsFontSizeToFit
-                    style={styles.defeatTitle}
+                    style={[styles.defeatTitle, compactTitle && styles.defeatTitleCompact]}
                   >
                     {BOSS_COPY.defeatTitle}
                   </SystemText>
@@ -246,6 +248,7 @@ const styles = StyleSheet.create({
   titleZone: { height: typography.display.fontSize + spacing.lg, justifyContent: 'center' },
   titleLayer: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   defeatTitle: { letterSpacing: spacing.xxs },
+  defeatTitleCompact: { fontSize: 34 },
   nameBlock: { gap: spacing.xxs, marginTop: -spacing.xs },
   lineZone: { height: typography.caption.lineHeight + spacing.xs, justifyContent: 'center' },
   lineLayer: { ...StyleSheet.absoluteFill, justifyContent: 'center' },
