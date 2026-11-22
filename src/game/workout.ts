@@ -1,6 +1,7 @@
 /** Pure helpers for workout sessions and the rest timer (docs/GAME_DESIGN.md §9). */
+import { compareDayKeys, toDayKey } from './date';
 import { exerciseXp } from './engine';
-import type { ExerciseEntry, ExerciseId } from './types';
+import type { DayKey, ExerciseEntry, ExerciseId } from './types';
 
 export const REST_PRESETS_SECONDS: readonly number[] = [30, 60, 90, 120, 180];
 export const DEFAULT_REST_SECONDS = 60;
@@ -57,4 +58,24 @@ export function summarizeSets(entries: ExerciseEntry[]): ExerciseTotal[] {
 /** Estimated level XP for a list of sets when XP is not locked (quest rewards excluded). */
 export function previewSessionXp(entries: ExerciseEntry[]): number {
   return entries.reduce((acc, entry) => acc + exerciseXp(entry), 0);
+}
+
+export interface DaySplit<T> {
+  /** Sets added on or before the closing day (they count for that day). */
+  closing: T[];
+  /** Sets added after it (they stay in the open workout). */
+  remaining: T[];
+}
+
+/**
+ * Splits an open workout at a day change (docs §9): each set counts for the local day of
+ * its `at` timestamp. Order is preserved in both parts.
+ */
+export function splitSetsAtDayChange<T extends { at: number }>(sets: readonly T[], closingDay: DayKey): DaySplit<T> {
+  const closing: T[] = [];
+  const remaining: T[] = [];
+  for (const set of sets) {
+    (compareDayKeys(toDayKey(set.at), closingDay) <= 0 ? closing : remaining).push(set);
+  }
+  return { closing, remaining };
 }

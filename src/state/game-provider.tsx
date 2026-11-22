@@ -22,6 +22,7 @@ import {
   markRestDay as markRestDayRule,
   msUntilNextMidnight,
   rolloverDay,
+  splitSetsAtDayChange,
   submitRankExam,
   toDayKey,
   unmarkRestDay as unmarkRestDayRule,
@@ -337,14 +338,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
     let autoSavedSets = 0;
     const draft = draftRef.current;
     if (compareDayKeys(todayKey, current.lastRolloverDay) > 0 && draft.sets.length > 0) {
-      const closingDay = current.lastRolloverDay;
-      const stale = draft.sets.filter((set) => compareDayKeys(toDayKey(set.at), closingDay) <= 0);
-      if (stale.length > 0) {
-        await recordSets(current, stale.map(draftEntry), draft.startedAt ?? stale[0].at, stale[stale.length - 1].at);
+      const { closing, remaining } = splitSetsAtDayChange(draft.sets, current.lastRolloverDay);
+      if (closing.length > 0) {
+        await recordSets(current, closing.map(draftEntry), draft.startedAt ?? closing[0].at, closing[closing.length - 1].at);
         current = stateRef.current ?? current;
-        const remaining = draft.sets.filter((set) => !stale.includes(set));
         await persistDraft({ ...draft, sets: remaining, startedAt: remaining[0]?.at ?? null });
-        autoSavedSets = stale.length;
+        autoSavedSets = closing.length;
       }
     }
 
