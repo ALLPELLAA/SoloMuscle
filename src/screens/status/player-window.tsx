@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, View } from 'react-native';
 
 import { RankBadge } from '@/components/rank-badge';
@@ -66,11 +67,28 @@ export function PlayerWindow({ player, xpLocked }: PlayerWindowProps) {
         <View style={styles.separator} />
         <View style={styles.infoCell}>
           <SystemText variant="label" tone="muted">
-            TOPLAM XP
+            TOPLAM
           </SystemText>
-          <SystemText variant="mono" tone="gold">
-            {player.totalXp.toLocaleString('tr-TR')}
+          <SystemText variant="mono" tone="gold" numberOfLines={1}>
+            {`${player.totalXp.toLocaleString('tr-TR')} XP`}
           </SystemText>
+        </View>
+        <View style={styles.separator} />
+        <View style={styles.infoCell} accessible accessibilityLabel={`Seri ${player.streak.current} gün`}>
+          <SystemText variant="label" tone="muted">
+            SERİ
+          </SystemText>
+          <View style={styles.streakRow}>
+            <Ionicons
+              name={player.streak.current > 0 ? 'flame' : 'flame-outline'}
+              size={16}
+              color={player.streak.current > 0 ? colors.warning : colors.textMuted}
+            />
+            <SystemText variant="mono" style={{ color: player.streak.current > 0 ? colors.warning : colors.textMuted }}>
+              {`${player.streak.current} gün`}
+            </SystemText>
+          </View>
+          <SystemText variant="caption" tone="muted">{`En iyi: ${player.streak.best}`}</SystemText>
         </View>
       </View>
 
@@ -101,5 +119,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   infoCell: { flex: 1, gap: spacing.xxs },
+  streakRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   separator: { width: 1, alignSelf: 'stretch', backgroundColor: colors.neonFaint },
 });

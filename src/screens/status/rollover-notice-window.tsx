@@ -20,13 +20,21 @@ function headlineFor(notice: RolloverNotice): string {
   if (notice.penaltyStarted) return 'CEZA GÖREVİ AÇILDI';
   if (notice.penaltyContinues) return 'CEZA GÖREVİ DEVAM EDİYOR';
   if (notice.daysSkipped > 0) return `${notice.daysSkipped} GÜN ATLANDI`;
-  return 'GÖREV KAÇIRILDI';
+  if (notice.failedDaily) return 'GÖREV KAÇIRILDI';
+  if (notice.excusedDaily) return 'DİNLENME GÜNÜ TAMAMLANDI';
+  return 'SERİ SIFIRLANDI';
 }
 
 function linesFor(notice: RolloverNotice): NoticeLine[] {
   const lines: NoticeLine[] = [];
   if (notice.failedDaily) {
     lines.push({ icon: 'close-circle-outline', text: 'Dünkü günlük görev süresi doldu: görev kaçırıldı.' });
+  }
+  if (notice.excusedDaily) {
+    lines.push({
+      icon: 'bed-outline',
+      text: 'Dün dinlenme/hasta günü olarak işaretliydi: tamamlanmayan görev için ceza yok, serin korundu.',
+    });
   }
   if (notice.daysSkipped > 0) {
     lines.push({
@@ -45,6 +53,9 @@ function linesFor(notice: RolloverNotice): NoticeLine[] {
       icon: 'lock-closed-outline',
       text: 'Önceki Ceza Görevi hâlâ tamamlanmadı. XP kilidi devam ediyor.',
     });
+  }
+  if (notice.streakLost > 0) {
+    lines.push({ icon: 'flame-outline', text: `${notice.streakLost} günlük serin sıfırlandı.` });
   }
   return lines;
 }

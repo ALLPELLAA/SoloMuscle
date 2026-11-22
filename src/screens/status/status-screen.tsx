@@ -8,6 +8,7 @@ import { useGame } from '@/state/game-provider';
 
 import { PenaltyBanner } from './penalty-banner';
 import { PlayerWindow } from './player-window';
+import { RestDayBanner } from './rest-day-banner';
 import { RolloverNoticeWindow } from './rollover-notice-window';
 import { StatsWindow } from './stats-window';
 import { StatusTopBar } from './status-top-bar';
@@ -25,7 +26,7 @@ const openQuests = () => router.push('/(tabs)/quests');
 
 /** "Durum" tab: the RPG status window of the player. */
 export function StatusScreen() {
-  const { state, today, xpLocked, rolloverNotice, dismissRolloverNotice } = useGame();
+  const { state, today, xpLocked, rolloverNotice, dismissRolloverNotice, restDayToday } = useGame();
 
   if (!state) {
     return (
@@ -51,6 +52,7 @@ export function StatusScreen() {
         <RolloverNoticeWindow notice={rolloverNotice} onDismiss={dismissRolloverNotice} onOpenQuests={openQuests} />
       ) : null}
       {xpLocked ? <PenaltyBanner onPress={openQuests} /> : null}
+      {restDayToday ? <RestDayBanner restDay={restDayToday} onPress={openQuests} /> : null}
       <PlayerWindow player={player} xpLocked={xpLocked} />
       <StatsWindow player={player} onAllocate={() => router.push('/allocate')} />
       <TodayQuestSection quest={dailyQuest} xpLocked={xpLocked} onOpenQuests={openQuests} />
