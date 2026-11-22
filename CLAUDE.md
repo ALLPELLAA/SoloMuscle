@@ -83,6 +83,12 @@ npm run lint              # expo lint
 npx expo export -p android   # Android bundle derleme kontrolü
 ```
 
+Notlar:
+- Test dosyaları `/// <reference types="jest" />` satırıyla başlar (TypeScript 6 `@types/jest`'i otomatik yüklemez).
+- Hızlı UI kontrolü için `npm run web` (expo-sqlite wasm ile çalışır; bildirimler web'de no-op).
+  Geliştirme modunda web'de `window.__solomuscleDev` = `{ seed, log, advanceDay, allocate, rest, getState }`
+  ile oyuncu oluşturulup gün dönümü simüle edilebilir. Telefonda aynı test için: Ayarlar → Geliştirici araçları.
+
 Paket eklerken sürümü SDK'ya uygun seç: `node -e "console.log(require('expo/bundledNativeModules.json')['<paket>'])"`
 (bu ortamda `npx expo install` ağ kısıtı nedeniyle çalışmayabilir).
 
